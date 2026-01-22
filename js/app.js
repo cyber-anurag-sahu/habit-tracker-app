@@ -9,6 +9,12 @@ const App = {
         this.bindEvents();
         this.checkAnnouncement(); // Check on load
 
+        // Setup Date & Day Checker
+        this.updateDateDisplay();
+        this.startDayChecker();
+
+        this.adminUnsub = null;
+
         // Auth Listener
         auth.onAuthStateChanged(async (user) => {
             if (user) {
@@ -43,19 +49,20 @@ const App = {
                     const dashboardBtn = document.querySelector('button[data-view="dashboard"]');
                     const analyticsBtn = document.querySelector('button[data-view="analytics"]');
 
+                    // Always show Dashboard & Analytics
+                    if (dashboardBtn) dashboardBtn.style.display = 'flex';
+                    if (analyticsBtn) analyticsBtn.style.display = 'flex';
+
                     if (Store.isAdmin) {
+                        // Admin gets the extra button
                         if (adminBtn) adminBtn.style.display = 'flex';
-                        if (dashboardBtn) dashboardBtn.style.display = 'none';
-                        if (analyticsBtn) analyticsBtn.style.display = 'none';
-
-                        this.switchView('admin');
                     } else {
+                        // Normal users do not
                         if (adminBtn) adminBtn.style.display = 'none';
-                        if (dashboardBtn) dashboardBtn.style.display = 'flex'; // or 'block' depending on css, flex is safer for nav-btn
-                        if (analyticsBtn) analyticsBtn.style.display = 'flex';
-
-                        this.switchView('dashboard');
                     }
+
+                    // Default to Dashboard for everyone
+                    this.switchView('dashboard');
                 }
             } else {
                 console.log('User logged out');
@@ -92,6 +99,7 @@ const App = {
             emailAuthBtn: document.getElementById('email-auth-btn'),
             authToggleBtn: document.getElementById('auth-toggle-btn'),
             authToggleText: document.getElementById('auth-toggle-text'),
+            forgotPasswordBtn: document.getElementById('forgot-password-btn'),
 
             // User Profile Elements
             logoutBtn: document.getElementById('logout-btn'),
@@ -122,15 +130,78 @@ const App = {
             announcementText: document.getElementById('announcement-text')
         };
 
-        // Date Setup
-        const options = { weekday: 'long', month: 'long', day: 'numeric' };
-        this.dom.dateDisplay.textContent = new Date().toLocaleDateString('en-US', options);
-
+        // Date Setup moved to updateDateDisplay
         this.selectedEmoji = '💧'; // Default
     },
 
     bindEvents() {
         this.isLoginMode = true;
+
+        // --- Tabs Logic ---
+
+
+
+        if (this.dom.loginBtn) {
+            this.dom.loginBtn.addEventListener('click', () => {
+                const provider = new firebase.auth.GoogleAuthProvider();
+                auth.signInWithPopup(provider).catch(error => {
+                    console.error("Login failed:", error);
+                    alert("Login failed: " + error.message);
+                });
+            });
+        }
+
+        // --- Tabs Logic ---
+        if (this.dom.tabEmail && this.dom.tabPhone) {
+            this.dom.tabEmail.addEventListener('click', () => this.switchAuthTab('email'));
+            this.dom.tabPhone.addEventListener('click', () => this.switchAuthTab('phone'));
+        }
+
+        // --- Phone Auth Logic ---
+        if (this.dom.sendOtpBtn) {
+            this.dom.sendOtpBtn.addEventListener('click', () => this.handleSendOTP());
+        }
+        if (this.dom.verifyOtpBtn) {
+            this.dom.verifyOtpBtn.addEventListener('click', () => this.handleVerifyOTP());
+        }
+        if (this.dom.backToPhoneBtn) {
+            this.dom.backToPhoneBtn.addEventListener('click', () => {
+                this.dom.phoneStep1.style.display = 'block';
+                this.dom.phoneStep2.style.display = 'none';
+                this.confirmationResult = null;
+            });
+        }
+
+        if (this.dom.loginBtn) {
+            this.dom.loginBtn.addEventListener('click', () => {
+                const provider = new firebase.auth.GoogleAuthProvider();
+                auth.signInWithPopup(provider).catch(error => {
+                    console.error("Login failed:", error);
+                    alert("Login failed: " + error.message);
+                });
+            });
+        }
+
+        // --- Tabs Logic ---
+        if (this.dom.tabEmail && this.dom.tabPhone) {
+            this.dom.tabEmail.addEventListener('click', () => this.switchAuthTab('email'));
+            this.dom.tabPhone.addEventListener('click', () => this.switchAuthTab('phone'));
+        }
+
+        // --- Phone Auth Logic ---
+        if (this.dom.sendOtpBtn) {
+            this.dom.sendOtpBtn.addEventListener('click', () => this.handleSendOTP());
+        }
+        if (this.dom.verifyOtpBtn) {
+            this.dom.verifyOtpBtn.addEventListener('click', () => this.handleVerifyOTP());
+        }
+        if (this.dom.backToPhoneBtn) {
+            this.dom.backToPhoneBtn.addEventListener('click', () => {
+                this.dom.phoneStep1.style.display = 'block';
+                this.dom.phoneStep2.style.display = 'none';
+                this.confirmationResult = null;
+            });
+        }
 
         // --- Email Auth Logic ---
         if (this.dom.authToggleBtn) {
@@ -182,6 +253,13 @@ const App = {
                 } else {
                     auth.createUserWithEmailAndPassword(email, password).catch(handleError);
                 }
+            });
+        }
+
+        if (this.dom.forgotPasswordBtn) {
+            this.dom.forgotPasswordBtn.addEventListener('click', () => {
+                const email = this.dom.emailInput.value.trim();
+                this.handlePasswordReset(email);
             });
         }
 
@@ -342,6 +420,12 @@ const App = {
         // Check announcement periodically (e.g. on view switch or timer? For now just on load & manual call)
         this.checkAnnouncement();
 
+        // Clean up Admin listener if leaving admin
+        if (viewName !== 'admin' && this.adminUnsub) {
+            this.adminUnsub();
+            this.adminUnsub = null;
+        }
+
         if (viewName === 'analytics') {
             Charts.render();
         } else if (viewName === 'admin') {
@@ -371,46 +455,118 @@ const App = {
     async renderAdmin() {
         if (!Store.isAdmin) return;
 
-        const users = await Store.getAllUsers();
+        // If already listening, do nothing (or we could re-subscribe)
+        if (this.adminUnsub) return;
 
-        // Stats
-        const total = users.length;
-        const activeThreshold = new Date();
-        activeThreshold.setHours(activeThreshold.getHours() - 24);
-        const activeCount = users.filter(u => new Date(u.lastActive) > activeThreshold).length;
+        // Visual Feedback
+        this.dom.adminUserList.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:2rem; color:var(--text-secondary);">Connecting to Real-time Stream...</td></tr>';
 
-        this.dom.adminTotalUsers.textContent = total;
-        this.dom.adminActiveUsers.textContent = activeCount;
+        // Subscribe
+        this.adminUnsub = Store.subscribeToUsers(
+            (users) => {
+                console.log("Admin: Received", users.length, "users");
 
-        // Table
-        this.dom.adminUserList.innerHTML = users.map(u => `
-            <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
-                <td style="padding: 1rem; display: flex; align-items: center; gap: 0.75rem;">
-                    <img src="${u.photoURL || `https://ui-avatars.com/api/?name=${u.displayName}&background=6366f1&color=fff`}" 
-                         style="width: 32px; height: 32px; border-radius: 50%;">
-                    <span>${u.displayName}</span>
-                </td>
-                <td style="padding: 1rem; color: var(--text-secondary);">${u.email}</td>
-                <td style="padding: 1rem; color: var(--text-secondary);">${new Date(u.lastActive).toLocaleDateString()}</td>
-                <td style="padding: 1rem; text-align: right; display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem;">
-                    <span style="background: rgba(34, 197, 94, 0.1); color: var(--success); padding: 0.25rem 0.5rem; border-radius: 8px; font-size: 0.8rem;">Active</span>
-                    <button class="btn-icon inspect-btn" data-uid="${u.uid}" data-name="${u.displayName}" title="View Habits" style="background: rgba(255,255,255,0.1);">
-                        <i data-lucide="eye" style="width: 16px; height: 16px;"></i>
-                    </button>
-                </td>
-            </tr>
-        `).join('');
+                // Stats
+                const total = users.length;
+                const activeThreshold = new Date();
+                activeThreshold.setHours(activeThreshold.getHours() - 24);
 
-        // Re-bind click listeners for new elements
-        lucide.createIcons();
-        this.bindAdminDynamicEvents();
+                // Safe date parsing helper
+                const safeDate = (d) => {
+                    const date = new Date(d);
+                    return isNaN(date.getTime()) ? new Date(0) : date;
+                };
 
-        // Bulk Email logic
-        if (this.dom.adminEmailBtn) {
-            // Remove old listener to avoid dupes (simple way is clone or just ignore for now as render is idempotent-ish)
-            this.dom.adminEmailBtn.onclick = () => {
-                const emails = users.map(u => u.email).join(',');
-                window.location.href = `mailto:?bcc=${emails}&subject=Update from Orbit`;
+                const activeCount = users.filter(u => safeDate(u.lastActive) > activeThreshold).length;
+
+                this.dom.adminTotalUsers.textContent = total;
+                this.dom.adminActiveUsers.textContent = activeCount;
+
+                // Table Render
+                this.dom.adminUserList.innerHTML = users.map(u => {
+                    const lastActive = safeDate(u.lastActive);
+                    const lastActiveStr = lastActive.getFullYear() === 1970 ? 'Never' : lastActive.toLocaleDateString() + ' ' + lastActive.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+                    return `
+                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+                        <td style="padding: 1rem; display: flex; align-items: center; gap: 0.75rem;">
+                            <img src="${u.photoURL || `https://ui-avatars.com/api/?name=${u.displayName || 'User'}&background=6366f1&color=fff`}" 
+                                 style="width: 32px; height: 32px; border-radius: 50%;">
+                            <span>${u.displayName || 'Unknown'}</span>
+                        </td>
+                        <td style="padding: 1rem; color: var(--text-secondary);">${u.email || 'No Email'}</td>
+                        <td style="padding: 1rem; color: var(--text-secondary);">${lastActiveStr}</td>
+                        <td style="padding: 1rem; text-align: right; display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem;">
+                             <button class="btn-icon inspect-btn" data-uid="${u.uid}" data-name="${u.displayName}" title="View Habits" style="background: rgba(255,255,255,0.1);">
+                                <i data-lucide="eye" style="width: 16px; height: 16px;"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `}).join('');
+
+                lucide.createIcons();
+                this.bindAdminDynamicEvents();
+
+                // Setup Bulk Email
+                if (this.dom.adminEmailBtn) {
+                    this.dom.adminEmailBtn.onclick = () => {
+                        // Gather all emails, filter out empty ones
+                        const emails = users
+                            .map(u => u.email)
+                            .filter(e => e && e.includes('@'))
+                            .join(',');
+
+                        // Open default mail client with BCC (to hide emails from each other)
+                        window.location.href = `mailto:?bcc=${emails}&subject=Update from Orbit`;
+                    };
+                }
+            },
+            (error) => {
+                // Error Display
+                this.dom.adminUserList.innerHTML = `
+                    <tr>
+                        <td colspan="4" style="text-align:center; padding:2rem; color:var(--danger);">
+                            <i data-lucide="alert-triangle" style="margin-bottom:0.5rem;"></i><br>
+                            <strong>Connection Error</strong><br>
+                            ${error.message}<br>
+                            <span style="font-size:0.8rem; opacity:0.8;">Check Firebase Console > Firestore > Rules</span>
+                        </td>
+                    </tr>`;
+                lucide.createIcons();
+            }
+        );
+
+        // Setup Manual Refresh Button
+        const refreshBtn = document.getElementById('admin-refresh-btn');
+        if (refreshBtn) {
+            refreshBtn.onclick = () => {
+                if (this.adminUnsub) {
+                    this.adminUnsub();
+                    this.adminUnsub = null;
+                }
+                this.renderAdmin(); // Re-connect
+            };
+        }
+
+        // Setup Manual Add Button
+        const addUserBtn = document.getElementById('admin-add-user-btn');
+        if (addUserBtn) {
+            addUserBtn.onclick = async () => {
+                const uid = prompt("Enter the User UID (from Firebase Console):");
+                if (!uid) return;
+
+                const email = prompt("Enter User Email:");
+                if (!email) return;
+
+                const name = prompt("Enter Display Name:");
+                if (!name) return;
+
+                try {
+                    await Store.adminCreateUser(uid, email, name);
+                    alert("User record created! They should appear in the list instantly.");
+                } catch (e) {
+                    alert("Error creating user: " + e.message);
+                }
             };
         }
     },
@@ -454,7 +610,7 @@ const App = {
 
     render() {
         const habits = Store.getHabits();
-        const today = new Date().toISOString().split('T')[0];
+        const today = Store.getLocalDateString();
 
         // 1. Render Stats
         const stats = Store.getStats();
@@ -548,7 +704,7 @@ const App = {
     calculateStreak(habit) {
         let streak = 0;
         let d = new Date();
-        const today = d.toISOString().split('T')[0];
+        const today = Store.getLocalDateString(d);
 
         // If checked today, include it. If not, start check from yesterday.
         if (habit.history[today]) {
@@ -560,7 +716,7 @@ const App = {
         }
 
         while (true) {
-            const dayStr = d.toISOString().split('T')[0];
+            const dayStr = Store.getLocalDateString(d);
             if (habit.history[dayStr]) {
                 streak++;
                 d.setDate(d.getDate() - 1);
@@ -569,6 +725,57 @@ const App = {
             }
         }
         return streak;
+    },
+
+    updateDateDisplay() {
+        if (this.dom.dateDisplay) {
+            const options = { weekday: 'long', month: 'long', day: 'numeric' };
+            this.dom.dateDisplay.textContent = new Date().toLocaleDateString('en-US', options);
+        }
+    },
+
+    startDayChecker() {
+        // Track the last known date string (e.g., "Mon Jan 01 2024")
+        this.lastDateStr = new Date().toDateString();
+
+        // Check every minute if the day has changed
+        setInterval(async () => {
+            const now = new Date();
+            const currentDateStr = now.toDateString();
+
+            if (currentDateStr !== this.lastDateStr) {
+                console.log("Day changed! Resetting view...", currentDateStr);
+                this.lastDateStr = currentDateStr;
+
+                // Refresh Data from Cloud (Sync)
+                await Store.refresh();
+
+                // Refresh UI
+                this.updateDateDisplay();
+                this.render();
+                Charts.render();
+
+                // Refresh Admin if active
+                if (this.dom.adminUserList.offsetParent !== null) {
+                    this.renderAdmin();
+                }
+            }
+        }, 60000);
+    },
+
+    async handlePasswordReset(email) {
+        if (!email) {
+            alert("Please enter your email address first.");
+            return;
+        }
+
+        try {
+            await auth.sendPasswordResetEmail(email);
+            alert("Password reset email sent! Please check your inbox.");
+        } catch (error) {
+            console.error("Reset Error:", error);
+            alert("Error: " + error.message);
+        }
     }
 };
 

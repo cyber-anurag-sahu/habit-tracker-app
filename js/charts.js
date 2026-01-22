@@ -122,7 +122,7 @@ const Charts = {
         for (let i = 6; i >= 0; i--) {
             const d = new Date();
             d.setDate(d.getDate() - i);
-            const dateStr = d.toISOString().split('T')[0];
+            const dateStr = Store.getLocalDateString(d);
             const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
             labels.push(dayName);
 
@@ -176,7 +176,7 @@ const Charts = {
         for (let i = 29; i >= 0; i--) {
             const d = new Date();
             d.setDate(d.getDate() - i);
-            const dateStr = d.toISOString().split('T')[0];
+            const dateStr = Store.getLocalDateString(d);
             labels.push(d.getDate()); // Just day number
 
             let completedCount = 0;

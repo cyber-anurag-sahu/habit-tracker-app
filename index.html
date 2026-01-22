@@ -196,9 +196,19 @@
             <div id="view-admin" class="view hidden">
                 <div class="header-actions">
                     <h2>Admin Panel</h2>
-                    <button id="admin-email-btn" class="btn-primary" style="background: var(--accent);">
-                        <i data-lucide="mail"></i> Bulk Email
-                    </button>
+                    <div style="display:flex; gap:0.5rem;">
+                        <button id="admin-refresh-btn" class="btn-icon" title="Refresh List"
+                            style="background: var(--card-bg); border: var(--glass-border);">
+                            <i data-lucide="refresh-cw"></i>
+                        </button>
+                        <button id="admin-add-user-btn" class="btn-icon" title="Add Missing User"
+                            style="background: var(--card-bg); border: var(--glass-border);">
+                            <i data-lucide="user-plus"></i>
+                        </button>
+                        <button id="admin-email-btn" class="btn-primary" style="background: var(--accent);">
+                            <i data-lucide="mail"></i> Bulk Email
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Admin Stats -->
@@ -315,16 +325,24 @@
             <i data-lucide="orbit" style="width: 64px; height: 64px; color: var(--accent); margin-bottom: 1.5rem;"></i>
             <h1 style="margin-bottom: 0.5rem; font-size: 2rem;">Orbit</h1>
             <p style="color: var(--text-secondary); margin-bottom: 2rem;">Login to sync your habits across devices.</p>
+
+
+            <!-- Email Auth Form -->
             <div id="email-auth-form" style="width: 100%; margin-bottom: 1rem;">
                 <input type="email" id="email-input" placeholder="Email"
                     style="width: 100%; padding: 0.8rem; margin-bottom: 0.8rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-primary); outline: none;">
-                <div style="position: relative; width: 100%; margin-bottom: 0.8rem;">
+                <div style="position: relative; width: 100%; margin-bottom: 0.5rem;">
                     <input type="password" id="password-input" placeholder="Password"
                         style="width: 100%; padding: 0.8rem; padding-right: 2.5rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-primary); outline: none;">
                     <button id="toggle-password-btn" type="button" tabindex="-1"
                         style="position: absolute; right: 0.8rem; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 0; display: flex; align-items: center; justify-content: center;">
                         <i data-lucide="eye" style="width: 20px; height: 20px;"></i>
                     </button>
+                </div>
+                <div style="text-align: right; margin-bottom: 1.5rem;">
+                    <button id="forgot-password-btn"
+                        style="background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 0.8rem; font-weight: 500;">Forgot
+                        Password?</button>
                 </div>
 
                 <button id="email-auth-btn" class="btn-primary"

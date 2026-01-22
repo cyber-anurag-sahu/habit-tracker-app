@@ -12,7 +12,16 @@ window.Store = {
     isAdmin: false,
 
     // Admin List
-    ADMIN_EMAILS: ['sahuanurag2109@proton.me'], // Exclusive Access
+    ADMIN_EMAILS: ['sahuanurag2109@gmail.com'], // Exclusive Access
+    heartbeatInterval: null,
+
+    // Helper: Get Local Date String (YYYY-MM-DD)
+    getLocalDateString(d = new Date()) {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    },
 
     // NEW: Async Load
     async load(user) {
@@ -23,18 +32,21 @@ window.Store = {
 
         console.log("Admin Check:", email, this.ADMIN_EMAILS, "Result:", this.isAdmin);
 
+        // Sync User Doc (for Admin Directory) - Await to ensure creation
+        await this.updateUserRegistry(user);
+        this.startUserHeartbeat(user);
+
+        return await this.refresh();
+    },
+
+    async refresh() {
+        if (!this.userId) return false;
+
         this.habits = [];
         this.occasions = {};
 
-        // Sync User Doc (for Admin Directory)
-        this.updateUserRegistry(user);
-
         try {
             // 1. Fetch Habits
-            // Using onSnapshot for generic "fetch once" behavior or real-time?
-            // For simplicity and matching current architecture, let's just fetch once.
-            // If we want real-time, we'd set listeners, but that requires more refactoring of App.js
-            // If we want real-time, we'd set listeners, but that requires more refactoring of App.js
             const habitsSnap = await db.collection('users').doc(this.userId).collection('habits').get();
             habitsSnap.forEach(doc => {
                 this.habits.push({ id: doc.id, ...doc.data() });
@@ -46,10 +58,10 @@ window.Store = {
                 this.occasions = occasionsDoc.data();
             }
 
-            console.log('Data Loaded from Firestore');
+            console.log('Data Refreshed from Firestore');
             return true;
         } catch (error) {
-            console.error("Error loading data:", error);
+            console.error("Error refreshing data:", error);
             return false;
         }
     },
@@ -59,7 +71,7 @@ window.Store = {
     },
 
     getStats() {
-        const today = new Date().toISOString().split('T')[0];
+        const today = this.getLocalDateString();
         const total = this.habits.length;
         if (total === 0) return { completed: 0, total: 0, percentage: 0, bestStreak: 0 };
 
@@ -87,6 +99,7 @@ window.Store = {
             // Update local state
             const habitWithId = { id: docRef.id, ...newHabit };
             this.habits.push(habitWithId);
+            this.touchActivity(); // Notify Admin of activity
             return habitWithId;
         } catch (e) {
             console.error("Error adding habit", e);
@@ -107,6 +120,7 @@ window.Store = {
                 await db.collection('users').doc(this.userId).collection('habits').doc(id).update({
                     history: habit.history
                 });
+                this.touchActivity(); // Notify Admin of activity
             } catch (e) {
                 console.error("Error updating habit", e);
             }
@@ -119,6 +133,7 @@ window.Store = {
         try {
             await db.collection('users').doc(this.userId).collection('habits').doc(id).delete();
             this.habits = this.habits.filter(h => h.id !== id);
+            this.touchActivity(); // Notify Admin of activity
         } catch (e) {
             console.error("Delete failed", e);
         }
@@ -156,8 +171,31 @@ window.Store = {
                 photoURL: user.photoURL || null,
                 lastActive: new Date().toISOString()
             }, { merge: true });
+            console.log("Registry sync success");
         } catch (e) {
             console.error("Registry sync failed", e);
+        }
+    },
+
+    startUserHeartbeat(user) {
+        if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
+
+        // Retry sync every 2 minutes to guarantee directory presence
+        this.heartbeatInterval = setInterval(() => {
+            this.updateUserRegistry(user);
+        }, 120000);
+    },
+
+    // NEW: Update activity without full profile write
+    async touchActivity() {
+        if (!this.userId) return;
+        try {
+            await db.collection('users').doc(this.userId).update({
+                lastActive: new Date().toISOString()
+            });
+        } catch (e) {
+            // Ignore minor sync errors for activity pings
+            console.warn("Activity ping failed", e);
         }
     },
 
@@ -165,7 +203,9 @@ window.Store = {
         if (!this.isAdmin) return [];
 
         try {
-            const snap = await db.collection('users').get(); // Removed limit for now to see all
+            // Force fetch from server to get latest updates
+            const snap = await db.collection('users').get({ source: 'server' });
+
 
             const users = [];
             snap.forEach(doc => {
@@ -178,10 +218,40 @@ window.Store = {
         }
     },
 
+    subscribeToUsers(onUpdate) {
+        if (!this.isAdmin) return () => { };
+
+        // Return the unsubscribe function
+        return db.collection('users').onSnapshot(snapshot => {
+            const users = [];
+            snapshot.forEach(doc => {
+                users.push({ uid: doc.id, ...doc.data() });
+            });
+            onUpdate(users);
+        }, error => {
+            console.error("Admin Users Listener Error:", error);
+        });
+    },
+
+    async adminCreateUser(uid, email, displayName) {
+        if (!this.isAdmin) return;
+        try {
+            await db.collection('users').doc(uid).set({
+                email: email,
+                displayName: displayName,
+                photoURL: `https://ui-avatars.com/api/?name=${displayName}&background=6366f1&color=fff`,
+                lastActive: new Date().toISOString()
+            }, { merge: true });
+        } catch (e) {
+            console.error("Admin manual create failed", e);
+            throw e;
+        }
+    },
+
     async getUserHabits(targetUid) {
         if (!this.isAdmin) return [];
         try {
-            const snap = await db.collection('users').doc(targetUid).collection('habits').get();
+            const snap = await db.collection('users').doc(targetUid).collection('habits').get({ source: 'server' });
             const habits = [];
             snap.forEach(doc => habits.push({ id: doc.id, ...doc.data() }));
             return habits;
