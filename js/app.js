@@ -7,6 +7,7 @@ const App = {
     async init() {
         this.cacheDOM();
         this.bindEvents();
+        this.checkAnnouncement(); // Check on load
 
         // Auth Listener
         auth.onAuthStateChanged(async (user) => {
@@ -19,11 +20,42 @@ const App = {
                     // Could update UI to show avatar, but for now just load data
                 }
 
+                // Update Profile UI
+                if (this.dom.userDisplayName) {
+                    // Prefer Display Name, fallback to email prefix
+                    const name = user.displayName || (user.email ? user.email.split('@')[0] : 'User');
+                    this.dom.userDisplayName.textContent = name;
+                }
+                if (this.dom.userAvatar) {
+                    // Use photoURL if available, else UI Avatars
+                    const name = user.displayName || (user.email ? user.email.split('@')[0] : 'User');
+                    this.dom.userAvatar.src = user.photoURL || `https://ui-avatars.com/api/?name=${name}&background=6366f1&color=fff`;
+                }
+
                 // Load Data
-                const success = await Store.load(user.uid);
+                const success = await Store.load(user);
                 if (success) {
                     this.render();
                     Charts.render();
+
+                    // Show Admin Button if applicable
+                    const adminBtn = document.getElementById('nav-admin-btn');
+                    const dashboardBtn = document.querySelector('button[data-view="dashboard"]');
+                    const analyticsBtn = document.querySelector('button[data-view="analytics"]');
+
+                    if (Store.isAdmin) {
+                        if (adminBtn) adminBtn.style.display = 'flex';
+                        if (dashboardBtn) dashboardBtn.style.display = 'none';
+                        if (analyticsBtn) analyticsBtn.style.display = 'none';
+
+                        this.switchView('admin');
+                    } else {
+                        if (adminBtn) adminBtn.style.display = 'none';
+                        if (dashboardBtn) dashboardBtn.style.display = 'flex'; // or 'block' depending on css, flex is safer for nav-btn
+                        if (analyticsBtn) analyticsBtn.style.display = 'flex';
+
+                        this.switchView('dashboard');
+                    }
                 }
             } else {
                 console.log('User logged out');
@@ -50,7 +82,44 @@ const App = {
 
             // New Elements
             loginOverlay: document.getElementById('login-overlay'),
-            loginBtn: document.getElementById('google-login-btn')
+            loginBtn: document.getElementById('google-login-btn'),
+
+            // Email Auth Elements
+            emailInput: document.getElementById('email-input'),
+            passwordInput: document.getElementById('password-input'),
+            togglePasswordBtn: document.getElementById('toggle-password-btn'),
+            emailAuthBtn: document.getElementById('email-auth-btn'),
+            emailAuthBtn: document.getElementById('email-auth-btn'),
+            authToggleBtn: document.getElementById('auth-toggle-btn'),
+            authToggleText: document.getElementById('auth-toggle-text'),
+
+            // User Profile Elements
+            logoutBtn: document.getElementById('logout-btn'),
+            userAvatar: document.getElementById('user-avatar'),
+            userDisplayName: document.getElementById('user-display-name'),
+
+            // Admin Elements
+            adminUserList: document.getElementById('admin-user-list'),
+            adminTotalUsers: document.getElementById('admin-total-users'),
+            adminActiveUsers: document.getElementById('admin-active-users'),
+            adminUserList: document.getElementById('admin-user-list'),
+            adminTotalUsers: document.getElementById('admin-total-users'),
+            adminActiveUsers: document.getElementById('admin-active-users'),
+            adminEmailBtn: document.getElementById('admin-email-btn'),
+
+            // Enhanced Admin
+            adminAnnouncementInput: document.getElementById('admin-announcement-input'),
+            adminAnnouncementType: document.getElementById('admin-announcement-type'),
+            adminPostBtn: document.getElementById('admin-post-announcement'),
+            adminClearBtn: document.getElementById('admin-clear-announcement'),
+            inspectorModal: document.getElementById('inspector-modal'),
+            closeInspectorBtn: document.getElementById('close-inspector-btn'),
+            inspectorContent: document.getElementById('inspector-content'),
+            inspectorTitle: document.getElementById('inspector-title'),
+
+            // Announcement
+            announcementBanner: document.getElementById('announcement-banner'),
+            announcementText: document.getElementById('announcement-text')
         };
 
         // Date Setup
@@ -61,11 +130,99 @@ const App = {
     },
 
     bindEvents() {
-        // Login
+        this.isLoginMode = true;
+
+        // --- Email Auth Logic ---
+        if (this.dom.authToggleBtn) {
+            this.dom.authToggleBtn.addEventListener('click', () => {
+                this.isLoginMode = !this.isLoginMode;
+                if (this.isLoginMode) {
+                    this.dom.emailAuthBtn.textContent = "Log In";
+                    this.dom.authToggleText.textContent = "Don't have an account?";
+                    this.dom.authToggleBtn.textContent = "Sign Up";
+                } else {
+                    this.dom.emailAuthBtn.textContent = "Sign Up";
+                    this.dom.authToggleText.textContent = "Already have an account?";
+                    this.dom.authToggleBtn.textContent = "Log In";
+                }
+            });
+        }
+
+        if (this.dom.emailAuthBtn) {
+            this.dom.emailAuthBtn.addEventListener('click', () => {
+                const email = this.dom.emailInput.value.trim();
+                const password = this.dom.passwordInput.value;
+
+                if (!email || !password) {
+                    alert("Please enter both email and password.");
+                    return;
+                }
+
+                const handleError = (err) => {
+                    console.error("Auth Error:", err);
+                    let msg = "An error occurred. Please try again.";
+
+                    if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+                        msg = "Invalid email or password. If you don't have an account, please switch to 'Sign Up'.";
+                    } else if (err.code === 'auth/email-already-in-use') {
+                        msg = "This email is already registered. Please Log In.";
+                    } else if (err.code === 'auth/weak-password') {
+                        msg = "Password should be at least 6 characters.";
+                    } else if (err.code === 'auth/invalid-email') {
+                        msg = "Please enter a valid email address.";
+                    } else if (err.code === 'auth/operation-not-allowed') {
+                        msg = "Email/Password login is not enabled in Firebase Console.";
+                    }
+
+                    alert(msg);
+                };
+
+                if (this.isLoginMode) {
+                    auth.signInWithEmailAndPassword(email, password).catch(handleError);
+                } else {
+                    auth.createUserWithEmailAndPassword(email, password).catch(handleError);
+                }
+            });
+        }
+
+        // --- Logout ---
+        if (this.dom.logoutBtn) {
+            this.dom.logoutBtn.addEventListener('click', () => {
+                auth.signOut().then(() => {
+                    console.log("Logged out");
+                    // Data clearing if needed
+                    this.dom.habitList.innerHTML = '';
+                    // The auth listener handles redirecting/showing overlay
+                }).catch(err => {
+                    console.error("Logout failed", err);
+                });
+            });
+        }
+
+        if (this.dom.togglePasswordBtn) {
+            this.dom.togglePasswordBtn.addEventListener('click', (e) => {
+                e.preventDefault(); // Prevent focus loss issues or form submission
+                const type = this.dom.passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                this.dom.passwordInput.setAttribute('type', type);
+
+                // Toggle Icon
+                const iconName = type === 'password' ? 'eye' : 'eye-off';
+                this.dom.togglePasswordBtn.innerHTML = `<i data-lucide="${iconName}" style="width: 20px; height: 20px;"></i>`;
+                lucide.createIcons({
+                    nameAttr: 'data-lucide',
+                    attrs: {
+                        class: "lucide lucide-" + iconName
+                    },
+                    root: this.dom.togglePasswordBtn
+                });
+            });
+        }
+
+        // --- Google Login ---
         if (this.dom.loginBtn) {
             this.dom.loginBtn.addEventListener('click', () => {
                 auth.signInWithPopup(provider).catch(err => {
-                    console.error("Login failed", err);
+                    console.error("Google Login failed", err);
                     alert("Login failed: " + err.message);
                 });
             });
@@ -128,51 +285,40 @@ const App = {
             });
         }
 
-        // Occasion Modal Logic
-        const occasionModal = document.getElementById('occasion-modal-overlay');
-        const closeOccasionBtn = document.getElementById('close-occasion-modal');
-        const occasionForm = document.getElementById('occasion-form');
-        const occasionDateInput = document.getElementById('occasion-date-input');
-        const occasionTextInput = document.getElementById('occasion-text');
-        const occasionTitle = document.getElementById('occasion-date-title');
 
-        // Close
-        closeOccasionBtn.addEventListener('click', () => occasionModal.classList.add('hidden'));
-        occasionModal.addEventListener('click', (e) => {
-            if (e.target === occasionModal) occasionModal.classList.add('hidden');
-        });
 
-        // Calendar Grid Delegation for Day Clicks
-        const yearContainer = document.getElementById('year-container');
-        if (yearContainer) {
-            yearContainer.addEventListener('click', (e) => {
-                const dayEl = e.target.closest('.mini-day');
-                if (dayEl && !dayEl.classList.contains('empty')) {
-                    const dateStr = dayEl.dataset.date;
-                    const occasions = Store.getOccasions();
-
-                    // Open Modal
-                    occasionModal.classList.remove('hidden');
-                    occasionDateInput.value = dateStr;
-                    occasionTitle.textContent = `Set Occasion: ${dateStr}`;
-                    occasionTextInput.value = occasions[dateStr] || '';
-                    occasionTextInput.focus();
+        // --- Admin Listeners ---
+        if (this.dom.adminPostBtn) {
+            this.dom.adminPostBtn.addEventListener('click', async () => {
+                const text = this.dom.adminAnnouncementInput.value.trim();
+                const type = this.dom.adminAnnouncementType.value;
+                if (text) {
+                    await Store.setAnnouncement(text, type, true);
+                    alert('Announcement Posted!');
+                    this.checkAnnouncement();
                 }
             });
         }
-
-        // Save Occasion
-        occasionForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const date = occasionDateInput.value;
-            const text = occasionTextInput.value.trim();
-
-            await Store.saveOccasion(date, text);
-            occasionModal.classList.add('hidden');
-
-            // Refresh calendar
-            Charts.renderCalendar(Store.getHabits());
-        });
+        if (this.dom.adminClearBtn) {
+            this.dom.adminClearBtn.addEventListener('click', async () => {
+                if (confirm('Clear current announcement?')) {
+                    await Store.setAnnouncement('', 'info', false);
+                    this.dom.adminAnnouncementInput.value = '';
+                    this.checkAnnouncement();
+                }
+            });
+        }
+        // Inspector Modal
+        if (this.dom.closeInspectorBtn) {
+            this.dom.closeInspectorBtn.addEventListener('click', () => {
+                this.dom.inspectorModal.classList.add('hidden');
+            });
+        }
+        if (this.dom.inspectorModal) {
+            this.dom.inspectorModal.addEventListener('click', (e) => {
+                if (e.target === this.dom.inspectorModal) this.dom.inspectorModal.classList.add('hidden');
+            });
+        }
     },
 
     switchView(viewName) {
@@ -193,9 +339,117 @@ const App = {
             }
         });
 
+        // Check announcement periodically (e.g. on view switch or timer? For now just on load & manual call)
+        this.checkAnnouncement();
+
         if (viewName === 'analytics') {
             Charts.render();
+        } else if (viewName === 'admin') {
+            this.renderAdmin();
         }
+    },
+
+    async checkAnnouncement() {
+        const data = await Store.getAnnouncement();
+        if (data && data.announcement && data.announcement.active) {
+            const { text, type } = data.announcement;
+            this.dom.announcementBanner.style.display = 'flex';
+            this.dom.announcementText.textContent = text;
+
+            // Colors
+            const colors = {
+                'info': 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                'alert': 'linear-gradient(135deg, #ef4444, #f87171)',
+                'success': 'linear-gradient(135deg, #22c55e, #4ade80)'
+            };
+            this.dom.announcementBanner.style.background = colors[type] || colors['info'];
+        } else {
+            this.dom.announcementBanner.style.display = 'none';
+        }
+    },
+
+    async renderAdmin() {
+        if (!Store.isAdmin) return;
+
+        const users = await Store.getAllUsers();
+
+        // Stats
+        const total = users.length;
+        const activeThreshold = new Date();
+        activeThreshold.setHours(activeThreshold.getHours() - 24);
+        const activeCount = users.filter(u => new Date(u.lastActive) > activeThreshold).length;
+
+        this.dom.adminTotalUsers.textContent = total;
+        this.dom.adminActiveUsers.textContent = activeCount;
+
+        // Table
+        this.dom.adminUserList.innerHTML = users.map(u => `
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+                <td style="padding: 1rem; display: flex; align-items: center; gap: 0.75rem;">
+                    <img src="${u.photoURL || `https://ui-avatars.com/api/?name=${u.displayName}&background=6366f1&color=fff`}" 
+                         style="width: 32px; height: 32px; border-radius: 50%;">
+                    <span>${u.displayName}</span>
+                </td>
+                <td style="padding: 1rem; color: var(--text-secondary);">${u.email}</td>
+                <td style="padding: 1rem; color: var(--text-secondary);">${new Date(u.lastActive).toLocaleDateString()}</td>
+                <td style="padding: 1rem; text-align: right; display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem;">
+                    <span style="background: rgba(34, 197, 94, 0.1); color: var(--success); padding: 0.25rem 0.5rem; border-radius: 8px; font-size: 0.8rem;">Active</span>
+                    <button class="btn-icon inspect-btn" data-uid="${u.uid}" data-name="${u.displayName}" title="View Habits" style="background: rgba(255,255,255,0.1);">
+                        <i data-lucide="eye" style="width: 16px; height: 16px;"></i>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+
+        // Re-bind click listeners for new elements
+        lucide.createIcons();
+        this.bindAdminDynamicEvents();
+
+        // Bulk Email logic
+        if (this.dom.adminEmailBtn) {
+            // Remove old listener to avoid dupes (simple way is clone or just ignore for now as render is idempotent-ish)
+            this.dom.adminEmailBtn.onclick = () => {
+                const emails = users.map(u => u.email).join(',');
+                window.location.href = `mailto:?bcc=${emails}&subject=Update from Orbit`;
+            };
+        }
+    },
+
+    bindAdminDynamicEvents() {
+        const inspectBtns = document.querySelectorAll('.inspect-btn');
+        inspectBtns.forEach(btn => {
+            btn.onclick = async (e) => {
+                const uid = btn.dataset.uid;
+                const name = btn.dataset.name;
+
+                this.dom.inspectorModal.classList.remove('hidden');
+                this.dom.inspectorTitle.textContent = `Inspecting: ${name}`;
+                this.dom.inspectorContent.innerHTML = '<p style="color:var(--text-secondary)">Loading user data...</p>';
+
+                // Fetch Data
+                const habits = await Store.getUserHabits(uid);
+
+                if (habits.length === 0) {
+                    this.dom.inspectorContent.innerHTML = '<p style="text-align:center; padding:1rem;">No habits found for this user.</p>';
+                } else {
+                    this.dom.inspectorContent.innerHTML = habits.map(h => {
+                        // Calc Streak
+                        const streak = this.calculateStreak(h);
+                        return `
+                            <div style="background: rgba(255,255,255,0.05); padding: 0.75rem; border-radius: 8px; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
+                                <div style="display:flex; align-items:center; gap:0.5rem;">
+                                    <span>${h.emoji}</span>
+                                    <strong>${h.name}</strong>
+                                </div>
+                                <div style="color: var(--accent); font-size: 0.9rem;">
+                                    🔥 ${streak} day streak
+                                </div>
+                            </div>
+                         `;
+                    }).join('');
+                }
+            };
+        });
     },
 
     render() {
@@ -228,7 +482,7 @@ const App = {
 
             const el = document.createElement('div');
             el.className = 'habit-item';
-            
+
             // Set data-id on buttons for robust selection
             el.innerHTML = `
                 <div class="habit-left">
@@ -256,7 +510,7 @@ const App = {
                 // FIXED: Use closest() to get the button even if icon is clicked
                 const btn = e.target.closest('.check-btn');
                 const id = btn.dataset.id;
-                
+
                 await Store.toggleCheck(id, today);
                 this.render();
                 Charts.render();

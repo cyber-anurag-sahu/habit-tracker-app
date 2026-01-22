@@ -47,7 +47,16 @@
             <button id="close-sidebar" class="close-sidebar-btn">
                 <i data-lucide="x"></i>
             </button>
-            <div class="brand">
+            <!-- Announcement Banner -->
+            <div id="announcement-banner"
+                style="display: none; background: linear-gradient(135deg, #6366f1, #8b5cf6); padding: 1rem; border-radius: 12px; margin-bottom: 2rem; align-items: center; justify-content: space-between; color: white; box-shadow: 0 4px 20px rgba(99, 102, 241, 0.3);">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <i data-lucide="megaphone"></i>
+                    <p id="announcement-text" style="font-weight: 500; margin: 0;">System Message</p>
+                </div>
+            </div>
+
+            <div class="header" id="dashboard-header">
                 <i data-lucide="orbit" class="logo-icon"></i>
                 <h1>Orbit</h1>
             </div>
@@ -64,9 +73,27 @@
                 <button class="nav-btn" data-view="analytics">
                     <i data-lucide="bar-chart-2"></i> Analytics
                 </button>
+                <button id="nav-admin-btn" class="nav-btn" data-view="admin" style="display: none;">
+                    <i data-lucide="shield"></i> Admin
+                </button>
             </nav>
 
-            <div class="quote-card">
+            <div id="user-profile-section" class="user-profile"
+                style="margin-top: auto; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: rgba(255,255,255,0.03); border-radius: 12px; width: 100%;">
+                <img id="user-avatar" src="https://ui-avatars.com/api/?name=User&background=6366f1&color=fff"
+                    style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(255,255,255,0.1);">
+                <div style="flex: 1; overflow: hidden;">
+                    <p id="user-display-name"
+                        style="font-size: 0.9rem; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                        User</p>
+                    <button id="logout-btn"
+                        style="background: none; border: none; padding: 0; color: var(--danger); font-size: 0.75rem; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 4px; margin-top: 2px;">
+                        <i data-lucide="log-out" style="width: 12px; height: 12px;"></i> Log Out
+                    </button>
+                </div>
+            </div>
+
+            <div class="quote-card" style="margin-top: 0;">
                 <p id="daily-quote">"Consistency is the key to achieving and maintaining momentum."</p>
             </div>
         </header>
@@ -165,6 +192,82 @@
                 </div>
             </div>
 
+            <!-- Admin View -->
+            <div id="view-admin" class="view hidden">
+                <div class="header-actions">
+                    <h2>Admin Panel</h2>
+                    <button id="admin-email-btn" class="btn-primary" style="background: var(--accent);">
+                        <i data-lucide="mail"></i> Bulk Email
+                    </button>
+                </div>
+
+                <!-- Admin Stats -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="icon-box"><i data-lucide="users"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-label">Total Users</span>
+                            <h3 class="stat-value" id="admin-total-users">0</h3>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="icon-box percent"><i data-lucide="activity"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-label">Active (24h)</span>
+                            <h3 class="stat-value" id="admin-active-users">0</h3>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Communications -->
+                <div class="habits-section" style="margin-top: 2rem;">
+                    <h3>Global Announcement</h3>
+                    <div
+                        style="background: var(--card-bg); border: var(--glass-border); border-radius: 12px; padding: 1rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <input type="text" id="admin-announcement-input" placeholder="Type a broadcast message..."
+                            style="flex: 1; min-width: 200px; padding: 0.8rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-primary); outline: none;">
+                        <select id="admin-announcement-type"
+                            style="padding: 0.8rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-primary);">
+                            <option value="info">Info (Purple)</option>
+                            <option value="alert">Alert (Red)</option>
+                            <option value="success">Success (Green)</option>
+                        </select>
+                        <button id="admin-post-announcement" class="btn-primary">Post</button>
+                        <button id="admin-clear-announcement" class="btn-icon" title="Clear"><i
+                                data-lucide="trash-2"></i></button>
+                    </div>
+                </div>
+
+                <!-- User Directory -->
+                <div class="habits-section" style="margin-top: 2rem;">
+                    <h3>User Directory</h3>
+                    <div class="table-container"
+                        style="overflow-x: auto; background: var(--card-bg); border-radius: 16px; border: var(--glass-border); padding: 1rem;">
+                        <table style="width: 100%; border-collapse: collapse; min-width: 600px;">
+                            <thead>
+                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+                                    <th
+                                        style="text-align: left; padding: 1rem; color: var(--text-secondary); font-weight: 500;">
+                                        User</th>
+                                    <th
+                                        style="text-align: left; padding: 1rem; color: var(--text-secondary); font-weight: 500;">
+                                        Email</th>
+                                    <th
+                                        style="text-align: left; padding: 1rem; color: var(--text-secondary); font-weight: 500;">
+                                        Last Active</th>
+                                    <th
+                                        style="text-align: right; padding: 1rem; color: var(--text-secondary); font-weight: 500;">
+                                        Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-user-list">
+                                <!-- Users injected here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
         </main>
     </div>
 
@@ -188,26 +291,21 @@
         </div>
     </div>
 
-    <!-- Occasion Modal -->
-    <div id="occasion-modal-overlay" class="modal-overlay hidden">
-        <div class="modal">
+
+
+    <!-- User Inspector Modal -->
+    <div id="inspector-modal" class="modal-overlay hidden">
+        <div class="modal" style="width: 500px; max-width: 95%;">
             <div class="modal-header">
-                <h3 id="occasion-date-title">Set Occasion</h3>
-                <button id="close-occasion-modal" class="btn-icon"><i data-lucide="x"></i></button>
+                <h3 id="inspector-title">User Details</h3>
+                <button id="close-inspector-btn" class="btn-icon"><i data-lucide="x"></i></button>
             </div>
-            <form id="occasion-form">
-                <input type="hidden" id="occasion-date-input">
-                <div class="form-group">
-                    <label>Occasion / Note</label>
-                    <input type="text" id="occasion-text" placeholder="e.g. Birthday, Holiday, Sick Day" maxlength="50">
-                    <small style="color:var(--text-secondary); display:block; margin-top:0.5rem;">Mark this day with a
-                        note. Leave empty to clear.</small>
-                </div>
-                <div class="form-actions">
-                    <button type="submit" class="btn-primary">Save Note</button>
-                </div>
-            </form>
+            <div id="inspector-content" style="padding-top: 0.5rem;">
+                <p style="color: var(--text-secondary);">Loading...</p>
+            </div>
         </div>
+    </div>
+
     </div>
 
     <!-- Login Overlay -->
@@ -217,8 +315,40 @@
             <i data-lucide="orbit" style="width: 64px; height: 64px; color: var(--accent); margin-bottom: 1.5rem;"></i>
             <h1 style="margin-bottom: 0.5rem; font-size: 2rem;">Orbit</h1>
             <p style="color: var(--text-secondary); margin-bottom: 2rem;">Login to sync your habits across devices.</p>
+            <div id="email-auth-form" style="width: 100%; margin-bottom: 1rem;">
+                <input type="email" id="email-input" placeholder="Email"
+                    style="width: 100%; padding: 0.8rem; margin-bottom: 0.8rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-primary); outline: none;">
+                <div style="position: relative; width: 100%; margin-bottom: 0.8rem;">
+                    <input type="password" id="password-input" placeholder="Password"
+                        style="width: 100%; padding: 0.8rem; padding-right: 2.5rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-primary); outline: none;">
+                    <button id="toggle-password-btn" type="button" tabindex="-1"
+                        style="position: absolute; right: 0.8rem; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 0; display: flex; align-items: center; justify-content: center;">
+                        <i data-lucide="eye" style="width: 20px; height: 20px;"></i>
+                    </button>
+                </div>
+
+                <button id="email-auth-btn" class="btn-primary"
+                    style="width: 100%; justify-content: center; padding: 0.8rem; margin-bottom: 1rem;">
+                    Log In
+                </button>
+
+                <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1.5rem;">
+                    <span id="auth-toggle-text">Don't have an account?</span>
+                    <button id="auth-toggle-btn"
+                        style="background: none; border: none; color: var(--accent); cursor: pointer; padding: 0; font-weight: 500;">Sign
+                        Up</button>
+                </p>
+
+                <div
+                    style="display: flex; align-items: center; justify-content: center; margin-bottom: 1.5rem; width: 100%;">
+                    <div style="height: 1px; background: var(--border-color); flex: 1;"></div>
+                    <span style="padding: 0 10px; color: var(--text-secondary); font-size: 0.8rem;">OR</span>
+                    <div style="height: 1px; background: var(--border-color); flex: 1;"></div>
+                </div>
+            </div>
+
             <button id="google-login-btn" class="btn-primary"
-                style="width: 100%; justify-content: center; font-size: 1.1rem; padding: 1rem;">
+                style="width: 100%; justify-content: center; font-size: 1rem; padding: 0.8rem; background: var(--bg-color); border: 1px solid var(--border-color);">
                 <i data-lucide="log-in"></i> Sign in with Google
             </button>
         </div>

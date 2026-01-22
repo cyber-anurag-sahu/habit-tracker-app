@@ -8,24 +8,40 @@ window.Store = {
     occasions: {},
     userId: null,
 
+    userId: null,
+    isAdmin: false,
+
+    // Admin List
+    ADMIN_EMAILS: ['sahuanurag2109@proton.me'], // Exclusive Access
+
     // NEW: Async Load
-    async load(uid) {
-        this.userId = uid;
+    async load(user) {
+        this.userId = user.uid;
+
+        const email = user.email ? user.email.toLowerCase() : '';
+        this.isAdmin = this.ADMIN_EMAILS.includes(email);
+
+        console.log("Admin Check:", email, this.ADMIN_EMAILS, "Result:", this.isAdmin);
+
         this.habits = [];
         this.occasions = {};
+
+        // Sync User Doc (for Admin Directory)
+        this.updateUserRegistry(user);
 
         try {
             // 1. Fetch Habits
             // Using onSnapshot for generic "fetch once" behavior or real-time?
             // For simplicity and matching current architecture, let's just fetch once.
             // If we want real-time, we'd set listeners, but that requires more refactoring of App.js
-            const habitsSnap = await db.collection('users').doc(uid).collection('habits').get();
+            // If we want real-time, we'd set listeners, but that requires more refactoring of App.js
+            const habitsSnap = await db.collection('users').doc(this.userId).collection('habits').get();
             habitsSnap.forEach(doc => {
                 this.habits.push({ id: doc.id, ...doc.data() });
             });
 
             // 2. Fetch Occasions
-            const occasionsDoc = await db.collection('users').doc(uid).collection('meta').doc('occasions').get();
+            const occasionsDoc = await db.collection('users').doc(this.userId).collection('meta').doc('occasions').get();
             if (occasionsDoc.exists) {
                 this.occasions = occasionsDoc.data();
             }
@@ -125,6 +141,83 @@ window.Store = {
             await db.collection('users').doc(this.userId).collection('meta').doc('occasions').set(this.occasions);
         } catch (e) {
             console.error("Occasion save failed", e);
+        }
+    },
+
+    // --- Admin Features ---
+
+    async updateUserRegistry(user) {
+        if (!user) return;
+        try {
+            // Ensure the parent doc users/{uid} exists so we can list it
+            await db.collection('users').doc(user.uid).set({
+                email: user.email,
+                displayName: user.displayName || 'User',
+                photoURL: user.photoURL || null,
+                lastActive: new Date().toISOString()
+            }, { merge: true });
+        } catch (e) {
+            console.error("Registry sync failed", e);
+        }
+    },
+
+    async getAllUsers() {
+        if (!this.isAdmin) return [];
+
+        try {
+            const snap = await db.collection('users').get(); // Removed limit for now to see all
+
+            const users = [];
+            snap.forEach(doc => {
+                users.push({ uid: doc.id, ...doc.data() });
+            });
+            return users;
+        } catch (e) {
+            console.error("Admin: Get Users failed", e);
+            return [];
+        }
+    },
+
+    async getUserHabits(targetUid) {
+        if (!this.isAdmin) return [];
+        try {
+            const snap = await db.collection('users').doc(targetUid).collection('habits').get();
+            const habits = [];
+            snap.forEach(doc => habits.push({ id: doc.id, ...doc.data() }));
+            return habits;
+        } catch (e) {
+            console.error("Admin: Get User Habits failed", e);
+            return [];
+        }
+    },
+
+    // --- Announcement System ---
+
+    async getAnnouncement() {
+        try {
+            const doc = await db.collection('settings').doc('global').get();
+            return doc.exists ? doc.data() : null;
+        } catch (e) {
+            console.error("Fetch announcement failed", e);
+            return null;
+        }
+    },
+
+    async setAnnouncement(text, type = 'info', active = true) {
+        if (!this.isAdmin) return;
+        try {
+            await db.collection('settings').doc('global').set({
+                announcement: {
+                    text,
+                    type,
+                    active,
+                    updatedAt: new Date().toISOString(),
+                    by: this.userId
+                }
+            }, { merge: true });
+        } catch (e) {
+            console.error("Set announcement failed", e);
+            alert("Error setting announcement: " + e.message); // Admin feedback
         }
     }
 };
