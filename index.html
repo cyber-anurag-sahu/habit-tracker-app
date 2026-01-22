@@ -27,9 +27,26 @@
 </head>
 
 <body>
+    <!-- Mobile Overlay -->
+    <div id="mobile-overlay" class="mobile-overlay"></div>
+
     <div class="app-container">
+        <!-- Mobile Header -->
+        <header class="mobile-header">
+            <div class="brand">
+                <i data-lucide="orbit" class="logo-icon" style="width: 24px; height: 24px; color: var(--accent);"></i>
+                <h1 style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary); margin-left: 0.5rem;">Orbit
+                </h1>
+            </div>
+            <button id="mobile-toggle" class="mobile-toggle">
+                <i data-lucide="menu" style="width: 24px; height: 24px;"></i>
+            </button>
+        </header>
         <!-- Sidebar / Header -->
         <header class="sidebar">
+            <button id="close-sidebar" class="close-sidebar-btn">
+                <i data-lucide="x"></i>
+            </button>
             <div class="brand">
                 <i data-lucide="orbit" class="logo-icon"></i>
                 <h1>Orbit</h1>
@@ -161,7 +178,7 @@
             <form id="habit-form">
                 <div class="form-group">
                     <label>Habit Name</label>
-                    <input type="text" id="habit-name" placeholder="e.g. Read 10 pages" required maxlength="30">
+                    <input type="text" id="habit-name" placeholder="e.g. Read 10 pages" required maxlength="60">
                 </div>
 
                 <div class="form-actions">
@@ -214,6 +231,39 @@
     <script src="js/app.js"></script>
     <script>
         lucide.createIcons();
+
+        // Mobile Sidebar Toggle Logic
+        const mobileToggle = document.getElementById('mobile-toggle');
+        const sidebar = document.querySelector('.sidebar');
+        const overlay = document.getElementById('mobile-overlay');
+        const closeSidebarBtn = document.getElementById('close-sidebar');
+
+        function toggleSidebar() {
+            sidebar.classList.toggle('open');
+            // Check if there's an overlay element we should toggle
+            if (overlay) {
+                if (sidebar.classList.contains('open')) {
+                    overlay.style.display = 'block';
+                    setTimeout(() => overlay.classList.add('active'), 10);
+                } else {
+                    overlay.classList.remove('active');
+                    setTimeout(() => overlay.style.display = 'none', 300);
+                }
+            }
+        }
+
+        if (mobileToggle) mobileToggle.addEventListener('click', toggleSidebar);
+        if (closeSidebarBtn) closeSidebarBtn.addEventListener('click', toggleSidebar);
+        if (overlay) overlay.addEventListener('click', toggleSidebar);
+
+        // Close sidebar when clicking a nav item on mobile
+        document.querySelectorAll('.nav-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (window.innerWidth <= 768 && sidebar.classList.contains('open')) {
+                    toggleSidebar();
+                }
+            });
+        });
     </script>
 </body>
 
