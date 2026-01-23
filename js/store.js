@@ -71,6 +71,32 @@ window.Store = {
         return this.habits;
     },
 
+    calculateStreak(habit) {
+        let streak = 0;
+        let d = new Date();
+        const today = this.getLocalDateString(d);
+
+        // If checked today, include it. If not, start check from yesterday.
+        if (habit.history[today]) {
+            streak++;
+            d.setDate(d.getDate() - 1);
+        } else {
+            // Check yesterday
+            d.setDate(d.getDate() - 1);
+        }
+
+        while (true) {
+            const dayStr = this.getLocalDateString(d);
+            if (habit.history[dayStr]) {
+                streak++;
+                d.setDate(d.getDate() - 1);
+            } else {
+                break;
+            }
+        }
+        return streak;
+    },
+
     getStats() {
         const today = this.getLocalDateString();
         const total = this.habits.length;
@@ -79,18 +105,41 @@ window.Store = {
         const completed = this.habits.filter(h => h.history[today]).length;
         const percentage = Math.round((completed / total) * 100);
 
-        // Simple best streak calc for summary
-        // In a real app we'd calc max streak across all habits
-        // We'll return 0 here and let App.js calculate per-habit streaks or improve this later
-        return { completed, total, percentage, bestStreak: 0 };
+        // Calculate "Perfect Day" Streak (Consequently completion of ALL habits)
+        let perfectStreak = 0;
+        let d = new Date();
+        const todayStr = this.getLocalDateString(d);
+
+        // 1. Check Today (if all done, start count)
+        const allDoneToday = this.habits.every(h => h.history[todayStr]);
+        if (allDoneToday) {
+            perfectStreak++;
+        }
+
+        // 2. Check Backwards
+        d.setDate(d.getDate() - 1); // Start from yesterday
+        while (true) {
+            const dayStr = this.getLocalDateString(d);
+            const allDone = this.habits.every(h => h.history[dayStr]);
+            if (allDone) {
+                perfectStreak++;
+                d.setDate(d.getDate() - 1);
+            } else {
+                break;
+            }
+        }
+
+        return { completed, total, percentage, bestStreak: perfectStreak };
     },
 
-    async addHabit(name, emoji) {
+    async addHabit(name, emoji, time = null, hasReminder = false) {
         if (!this.userId) return;
 
         const newHabit = {
             name,
             emoji: emoji || '⚡',
+            time,
+            hasReminder,
             history: {},
             createdAt: new Date().toISOString()
         };
@@ -125,6 +174,30 @@ window.Store = {
             } catch (e) {
                 console.error("Error updating habit", e);
             }
+        }
+    },
+
+    async updateHabit(id, name, emoji, time, hasReminder) {
+        if (!this.userId) return;
+
+        const timeData = {
+            name,
+            emoji: emoji || '⚡',
+            time,
+            hasReminder
+        };
+
+        try {
+            await db.collection('users').doc(this.userId).collection('habits').doc(id).update(timeData);
+
+            // Update local state
+            const habit = this.habits.find(h => h.id === id);
+            if (habit) {
+                Object.assign(habit, timeData);
+            }
+            this.touchActivity(); // Notify Admin
+        } catch (e) {
+            console.error("Error updating habit", e);
         }
     },
 

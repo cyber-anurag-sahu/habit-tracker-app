@@ -173,7 +173,7 @@
                 <!-- Heatmap Calendar -->
                 <div class="heatmap-section">
                     <div class="calendar-controls">
-                        <h3>Yearly Progress</h3>
+                        <h3>Monthly Progress</h3>
                         <!-- We can keep year-selector if we want to jump years, but for now focusing on month nav -->
                         <div class="year-selector-group">
                             <!-- Hidden or removed old controls if user only wants 2-month nav with arrows -->
@@ -183,8 +183,8 @@
                     <div class="calendar-wrapper">
                         <button id="month-prev" class="cal-nav-arrow"><i data-lucide="chevron-left"></i></button>
 
-                        <div id="year-container" class="year-container two-month-view">
-                            <!-- 2 Months injected here -->
+                        <div id="year-container" class="year-container single-month-view">
+                            <!-- Month injected here -->
                         </div>
 
                         <button id="month-next" class="cal-nav-arrow"><i data-lucide="chevron-right"></i></button>
@@ -367,6 +367,57 @@
                 <div class="form-group">
                     <label>Habit Name</label>
                     <input type="text" id="habit-name" placeholder="e.g. Read 10 pages" required maxlength="60">
+                </div>
+
+                <div class="form-group">
+                    <label>Reminder Time</label>
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                        <!-- Hour -->
+                        <select id="habit-time-hour"
+                            style="padding: 0.8rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-primary); cursor:pointer;">
+                            <option value="01">01</option>
+                            <option value="02">02</option>
+                            <option value="03">03</option>
+                            <option value="04">04</option>
+                            <option value="05">05</option>
+                            <option value="06">06</option>
+                            <option value="07">07</option>
+                            <option value="08">08</option>
+                            <option value="09" selected>09</option>
+                            <option value="10">10</option>
+                            <option value="11">11</option>
+                            <option value="12">12</option>
+                        </select>
+                        <span style="font-weight:bold;">:</span>
+                        <!-- Minute -->
+                        <select id="habit-time-minute"
+                            style="padding: 0.8rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-primary); cursor:pointer;">
+                            <option value="00" selected>00</option>
+                            <option value="05">05</option>
+                            <option value="10">10</option>
+                            <option value="15">15</option>
+                            <option value="20">20</option>
+                            <option value="25">25</option>
+                            <option value="30">30</option>
+                            <option value="35">35</option>
+                            <option value="40">40</option>
+                            <option value="45">45</option>
+                            <option value="50">50</option>
+                            <option value="55">55</option>
+                        </select>
+                        <!-- AM/PM -->
+                        <select id="habit-time-ampm"
+                            style="padding: 0.8rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-primary); cursor:pointer;">
+                            <option value="AM" selected>AM</option>
+                            <option value="PM">PM</option>
+                        </select>
+                    </div>
+
+                    <button type="button" id="habit-reminder-btn"
+                        style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.8rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-secondary); cursor: pointer; margin-top: 0.5rem; transition: all 0.2s;">
+                        <i data-lucide="bell" style="width: 18px; height: 18px;"></i>
+                        <span id="habit-reminder-text">Enable Reminder</span>
+                    </button>
                 </div>
 
                 <div class="form-actions">

@@ -39,7 +39,7 @@ const Charts = {
         const startYear = this.currentDate.getFullYear();
         const startMonth = this.currentDate.getMonth();
 
-        for (let i = 0; i < 2; i++) {
+        for (let i = 0; i < 1; i++) {
             // Calculate actual year/month for this iteration
             const loopDate = new Date(startYear, startMonth + i, 1);
             const year = loopDate.getFullYear();

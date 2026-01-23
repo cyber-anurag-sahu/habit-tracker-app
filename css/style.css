@@ -502,6 +502,25 @@ body {
     width: 100%;
 }
 
+.year-container.single-month-view {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+}
+
+.year-container.single-month-view .month-block {
+    width: 100%;
+    max-width: 800px;
+    /* Optional constraint for aesthetic */
+    padding: 1.5rem;
+}
+
+.year-container.single-month-view .mini-day {
+    aspect-ratio: 1.5;
+    /* Wider boxes for single view */
+    font-size: 0.9rem;
+}
+
 .month-block {
     background: rgba(255, 255, 255, 0.02);
     border-radius: 12px;

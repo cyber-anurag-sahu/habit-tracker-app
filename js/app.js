@@ -11,7 +11,11 @@ const App = {
 
         // Setup Date & Day Checker
         this.updateDateDisplay();
+        // Setup Date & Day Checker
+        this.updateDateDisplay();
         this.startDayChecker();
+        this.startReminderChecker();
+        this.registerServiceWorker();
 
         this.adminUnsub = null;
 
@@ -83,9 +87,18 @@ const App = {
             statEfficiency: document.getElementById('stat-efficiency'),
             addBtn: document.getElementById('add-habit-btn'),
             modalOverlay: document.getElementById('modal-overlay'),
+            modalTitle: document.querySelector('.modal-header h3'),
+            modalSubmitBtn: document.querySelector('.form-actions button'),
             closeModalBtn: document.getElementById('close-modal'),
             habitForm: document.getElementById('habit-form'),
             habitNameInput: document.getElementById('habit-name'),
+            // Time Selects
+            habitTimeHour: document.getElementById('habit-time-hour'),
+            habitTimeMinute: document.getElementById('habit-time-minute'),
+            habitTimeAmpm: document.getElementById('habit-time-ampm'),
+
+            habitReminderBtn: document.getElementById('habit-reminder-btn'),
+            habitReminderText: document.getElementById('habit-reminder-text'),
             emojiOptions: document.querySelectorAll('.emoji-opt'),
             navBtns: document.querySelectorAll('.nav-btn'),
             views: document.querySelectorAll('.view'),
@@ -304,17 +317,16 @@ const App = {
 
         // Modal
         this.dom.addBtn.addEventListener('click', () => {
-            this.dom.modalOverlay.classList.remove('hidden');
-            this.dom.habitNameInput.focus();
+            this.openModal();
         });
 
         this.dom.closeModalBtn.addEventListener('click', () => {
-            this.dom.modalOverlay.classList.add('hidden');
+            this.closeModal();
         });
 
         this.dom.modalOverlay.addEventListener('click', (e) => {
             if (e.target === this.dom.modalOverlay) {
-                this.dom.modalOverlay.classList.add('hidden');
+                this.closeModal();
             }
         });
 
@@ -322,17 +334,58 @@ const App = {
         this.dom.habitForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const name = this.dom.habitNameInput.value.trim();
+
+            // Construct Time
+            let hour = parseInt(this.dom.habitTimeHour.value, 10);
+            const minute = this.dom.habitTimeMinute.value;
+            const ampm = this.dom.habitTimeAmpm.value;
+
+            if (ampm === 'PM' && hour < 12) hour += 12;
+            if (ampm === 'AM' && hour === 12) hour = 0;
+            const time = `${String(hour).padStart(2, '0')}:${minute}`;
+
+            const hasReminder = this.dom.habitReminderBtn.dataset.active === 'true';
+
             if (name) {
-                // Async Add
-                await Store.addHabit(name, '⚡');
-                this.dom.habitNameInput.value = '';
-                this.dom.modalOverlay.classList.add('hidden');
+                if (this.editingId) {
+                    // Update
+                    await Store.updateHabit(this.editingId, name, '⚡', time, hasReminder);
+                    this.closeModal();
+                } else {
+                    // Create
+                    await Store.addHabit(name, '⚡', time, hasReminder);
+                    this.closeModal();
+                }
 
                 // Re-render
                 this.render();
                 Charts.render();
             }
         });
+
+        // Toggle Reminder Button Logic
+        if (this.dom.habitReminderBtn) {
+            this.dom.habitReminderBtn.addEventListener('click', () => {
+                const isActive = this.dom.habitReminderBtn.dataset.active === 'true';
+
+                if (!isActive) {
+                    // Turning ON
+                    if (Notification.permission !== "granted") {
+                        Notification.requestPermission().then(permission => {
+                            if (permission === "granted") {
+                                console.log("Notification permission granted");
+                                this.toggleReminderState(true);
+                            }
+                        });
+                    } else {
+                        this.toggleReminderState(true);
+                    }
+                } else {
+                    // Turning OFF
+                    this.toggleReminderState(false);
+                }
+            });
+        }
 
         // Navigation
         this.dom.navBtns.forEach(btn => {
@@ -773,7 +826,7 @@ const App = {
                 } else {
                     this.dom.inspectorContent.innerHTML = habits.map(h => {
                         // Calc Streak
-                        const streak = this.calculateStreak(h);
+                        const streak = Store.calculateStreak(h);
                         return `
                             <div style="background: rgba(255,255,255,0.05); padding: 0.75rem; border-radius: 8px; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
                                 <div style="display:flex; align-items:center; gap:0.5rem;">
@@ -817,7 +870,7 @@ const App = {
 
         habits.forEach(habit => {
             const isCompleted = !!habit.history[today];
-            const currentStreak = this.calculateStreak(habit);
+            const currentStreak = Store.calculateStreak(habit);
 
             const el = document.createElement('div');
             el.className = 'habit-item';
@@ -829,11 +882,15 @@ const App = {
                     <div class="habit-details">
                         <h4>${habit.name}</h4>
                         <div class="habit-streak">
+                            ${habit.hasReminder && habit.time ? `<i data-lucide="clock" style="width:14px; height:14px; margin-right:4px;"></i> ${habit.time} &bull; ` : ''}
                             <i data-lucide="flame" size="14"></i> ${currentStreak} day streak
                         </div>
                     </div>
                 </div>
                 <div style="display:flex; align-items:center;">
+                    <button class="btn-icon edit-btn" data-id="${habit.id}" title="Edit" style="color:var(--text-secondary); font-size: 0.85rem; background: transparent; border: 1px solid rgba(255,255,255,0.2); padding: 0.3rem 0.6rem; border-radius: 6px; margin-right: 0.75rem;">
+                         Edit
+                    </button>
                     <button class="check-btn ${isCompleted ? 'completed' : ''}" data-id="${habit.id}">
                         <i data-lucide="check"></i>
                     </button>
@@ -878,36 +935,62 @@ const App = {
                 }
             });
 
+            // Edit Event
+            const editBtn = el.querySelector('.edit-btn');
+            if (editBtn) {
+                editBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.openModal(habit);
+                });
+            }
+
             this.dom.habitList.appendChild(el);
         });
 
         lucide.createIcons();
     },
 
-    calculateStreak(habit) {
-        let streak = 0;
-        let d = new Date();
-        const today = Store.getLocalDateString(d);
+    openModal(habit = null) {
+        this.dom.modalOverlay.classList.remove('hidden');
 
-        // If checked today, include it. If not, start check from yesterday.
-        if (habit.history[today]) {
-            streak++;
-            d.setDate(d.getDate() - 1);
-        } else {
-            // Check yesterday
-            d.setDate(d.getDate() - 1);
-        }
+        if (habit) {
+            // Edit Mode
+            this.editingId = habit.id;
+            this.dom.modalTitle.textContent = "Edit Habit";
+            this.dom.modalSubmitBtn.textContent = "Update Habit";
+            this.dom.habitNameInput.value = habit.name;
 
-        while (true) {
-            const dayStr = Store.getLocalDateString(d);
-            if (habit.history[dayStr]) {
-                streak++;
-                d.setDate(d.getDate() - 1);
-            } else {
-                break;
+            if (habit.time) {
+                const [h, m] = habit.time.split(':');
+                let hour = parseInt(h);
+                const ampm = hour >= 12 ? 'PM' : 'AM';
+                if (hour > 12) hour -= 12;
+                if (hour === 0) hour = 12;
+
+                this.dom.habitTimeHour.value = String(hour).padStart(2, '0');
+                this.dom.habitTimeMinute.value = m;
+                this.dom.habitTimeAmpm.value = ampm;
             }
+
+            this.toggleReminderState(habit.hasReminder);
+        } else {
+            // Create Mode
+            this.editingId = null;
+            this.dom.modalTitle.textContent = "Create New Habit";
+            this.dom.modalSubmitBtn.textContent = "Create Habit";
+            this.dom.habitNameInput.value = '';
+            // Defaults
+            this.dom.habitTimeHour.value = '09';
+            this.dom.habitTimeMinute.value = '00';
+            this.dom.habitTimeAmpm.value = 'AM';
+            this.toggleReminderState(false);
         }
-        return streak;
+        this.dom.habitNameInput.focus();
+    },
+
+    closeModal() {
+        this.dom.modalOverlay.classList.add('hidden');
+        this.editingId = null;
     },
 
     updateDateDisplay() {
@@ -944,6 +1027,109 @@ const App = {
                 }
             }
         }, 60000);
+    },
+
+    async registerServiceWorker() {
+        if ('serviceWorker' in navigator) {
+            try {
+                // Register at root so scope includes everything
+                await navigator.serviceWorker.register('sw.js');
+                console.log('Service Worker Registered');
+
+                // Listen for messages from SW (e.g. "Done" clicked)
+                navigator.serviceWorker.addEventListener('message', async (event) => {
+                    if (event.data && event.data.type === 'HABIT_DONE') {
+                        const { habitId } = event.data;
+                        console.log("Notification 'Done' clicked for ID:", habitId);
+
+                        // Toggle Check
+                        const today = Store.getLocalDateString();
+                        await Store.toggleCheck(habitId, today);
+
+                        // Refresh UI
+                        this.render();
+                        Charts.render();
+                    }
+                });
+
+            } catch (error) {
+                console.error('SW Registration failed:', error);
+            }
+        }
+    },
+
+    toggleReminderState(isActive) {
+        if (!this.dom.habitReminderBtn) return;
+
+        if (isActive) {
+            this.dom.habitReminderBtn.dataset.active = 'true';
+            this.dom.habitReminderBtn.style.background = 'var(--accent)';
+            this.dom.habitReminderBtn.style.color = '#fff';
+            this.dom.habitReminderBtn.style.borderColor = 'var(--accent)';
+            this.dom.habitReminderText.textContent = "Reminder Set";
+            // Update icon color logic if needed, but text color handles it
+        } else {
+            this.dom.habitReminderBtn.dataset.active = 'false';
+            this.dom.habitReminderBtn.style.background = 'var(--bg-color)';
+            this.dom.habitReminderBtn.style.color = 'var(--text-secondary)';
+            this.dom.habitReminderBtn.style.borderColor = 'var(--border-color)';
+            this.dom.habitReminderText.textContent = "Enable Reminder";
+        }
+    },
+
+    startReminderChecker() {
+        // Check every 10 seconds
+        setInterval(() => {
+            this.checkReminders();
+        }, 10000);
+    },
+
+    async checkReminders() {
+        if (!("Notification" in window)) return;
+        if (Notification.permission !== "granted") return;
+
+        const now = new Date();
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const currentTime = `${hours}:${minutes}`;
+
+        // Prevent multiple notifications in the same minute
+        if (this.lastCheckedTime === currentTime) return;
+        this.lastCheckedTime = currentTime;
+
+        const habits = Store.getHabits();
+
+        // Attempt to get SW Registration
+        let reg = null;
+        if ('serviceWorker' in navigator) {
+            reg = await navigator.serviceWorker.ready.catch(() => null);
+        }
+
+        habits.forEach(h => {
+            if (h.hasReminder && h.time === currentTime) {
+                if (reg) {
+                    // Show Actionable Notification via SW
+                    reg.showNotification(`Time for ${h.name}!`, {
+                        body: `Don't forget to ${h.name} ${h.emoji}`,
+                        icon: 'https://cdn-icons-png.flaticon.com/512/2693/2693507.png',
+                        requireInteraction: true,
+                        data: { habitId: h.id },
+                        actions: [
+                            { action: 'done', title: 'Done' },
+                            { action: 'cancel', title: 'Cancel' }
+                        ]
+                    });
+                } else {
+                    // Fallback: Standard Notification (No Buttons)
+                    const n = new Notification(`Time for ${h.name}!`, {
+                        body: `Don't forget to ${h.name} ${h.emoji}`,
+                        icon: 'https://cdn-icons-png.flaticon.com/512/2693/2693507.png',
+                        requireInteraction: true
+                    });
+                    setTimeout(() => n.close(), 7000);
+                }
+            }
+        });
     },
 
     async handlePasswordReset(email) {
