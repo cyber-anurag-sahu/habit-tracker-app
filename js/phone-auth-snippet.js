@@ -114,4 +114,3 @@ setupRecaptcha() {
         this.dom.verifyOtpBtn.disabled = false;
     }
 },
-

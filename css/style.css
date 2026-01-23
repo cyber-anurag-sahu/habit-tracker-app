@@ -1,15 +1,29 @@
 :root {
-    --bg-color: #0f172a;
-    --bg-secondary: #1e293b;
-    --text-primary: #f8fafc;
-    --text-secondary: #94a3b8;
-    --accent: #6366f1;
-    /* Indigo */
-    --accent-glow: rgba(99, 102, 241, 0.4);
-    --success: #22c55e;
+    /* "Reliable Horizon" Palette - Plain & Simple */
+    --bg-color: #f1f5f9;
+    /* Slate 100 */
+    --bg-secondary: #ffffff;
+    /* Pure White */
+
+    --text-primary: #0f172a;
+    /* Slate 900 */
+    --text-secondary: #64748b;
+    /* Slate 500 */
+
+    /* Reliable Blue (Solid) */
+    --accent: #2563eb;
+    /* Blue 600 */
+    --accent-dark: #1d4ed8;
+    --accent-gradient: #2563eb;
+    /* Solid Blue */
+    --accent-glow: transparent;
+
+    --success: #10b981;
     --danger: #ef4444;
-    --card-bg: rgba(30, 41, 59, 0.7);
-    --glass-border: 1px solid rgba(255, 255, 255, 0.05);
+
+    /* Solid Surface */
+    --card-bg: #ffffff;
+    --glass-border: 1px solid #e2e8f0;
 
     --font-main: 'Outfit', sans-serif;
 }
@@ -24,9 +38,8 @@ body {
     font-family: var(--font-main);
     background-color: var(--bg-color);
     color: var(--text-primary);
-    background-image:
-        radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.15) 0%, transparent 20%),
-        radial-gradient(circle at 90% 80%, rgba(34, 197, 94, 0.1) 0%, transparent 20%);
+    /* Plain Background */
+    background-image: none;
     min-height: 100vh;
     display: flex;
     justify-content: center;
@@ -87,8 +100,10 @@ body {
 
 .nav-btn:hover,
 .nav-btn.active {
-    background: rgba(99, 102, 241, 0.1);
+    background: rgba(59, 130, 246, 0.1);
     color: var(--accent);
+    border-right: 3px solid var(--accent);
+    /* visual sentiment */
 }
 
 .quote-card {
@@ -131,20 +146,25 @@ body {
     color: white;
     border: none;
     padding: 0.75rem 1.5rem;
-    border-radius: 12px;
+    border-radius: 99px;
     font-family: inherit;
     font-weight: 600;
     cursor: pointer;
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    box-shadow: 0 4px 20px var(--accent-glow);
-    transition: transform 0.2s;
+    /* Clean shadow, no glow */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
 }
 
 .btn-primary:hover {
     transform: translateY(-2px);
+    background-color: var(--accent-dark);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    filter: none;
 }
+
 
 /* Stats */
 .stats-grid {
@@ -158,11 +178,20 @@ body {
     background: var(--card-bg);
     border: var(--glass-border);
     padding: 1.5rem;
-    border-radius: 16px;
+    border-radius: 12px;
     display: flex;
     align-items: center;
     gap: 1rem;
-    backdrop-filter: blur(10px);
+    backdrop-filter: none;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    /* Subtle depth */
+    transition: transform 0.3s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    border-color: #cbd5e1;
+    /* Slate 300 */
 }
 
 .icon-box {
@@ -216,16 +245,21 @@ body {
     background: var(--card-bg);
     border: var(--glass-border);
     padding: 1rem 1.5rem;
-    border-radius: 16px;
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    transition: all 0.3s ease;
+    transition: all 0.2s ease;
+    backdrop-filter: none;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .habit-item:hover {
-    background: rgba(30, 41, 59, 0.9);
-    transform: translateX(5px);
+    background: #f8fafc;
+    /* Slate 50 */
+    transform: translateY(-2px);
+    border-color: #cbd5e1;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
 }
 
 .habit-left {
@@ -278,9 +312,10 @@ body {
 }
 
 .check-btn.completed {
-    background: var(--accent);
-    border-color: var(--accent);
+    background: var(--accent-gradient);
+    border-color: transparent;
     color: white;
+    box-shadow: 0 0 10px var(--accent-glow);
 }
 
 .delete-btn {
@@ -321,13 +356,15 @@ body {
 }
 
 .modal {
-    background: #1e293b;
+    background: var(--card-bg);
+    /* Use theme variable */
     border: var(--glass-border);
     padding: 2rem;
     border-radius: 20px;
     width: 100%;
     max-width: 400px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+    /* Lighter shadow */
 }
 
 .modal-header {
@@ -350,11 +387,12 @@ body {
 
 .form-group input {
     width: 100%;
-    background: #0f172a;
-    border: 1px solid #334155;
+    background: var(--bg-color);
+    /* Use theme variable */
+    border: 1px solid #cbd5e1;
     padding: 0.75rem;
     border-radius: 8px;
-    color: white;
+    color: var(--text-primary);
     font-family: inherit;
     font-size: 1rem;
 }
@@ -378,14 +416,16 @@ body {
     justify-content: center;
     border-radius: 8px;
     cursor: pointer;
-    background: #0f172a;
+    background: var(--bg-color);
+    /* Theme variable */
     border: 1px solid transparent;
     font-size: 1.25rem;
     transition: all 0.2s;
 }
 
 .emoji-opt:hover {
-    background: #334155;
+    background: #e2e8f0;
+    /* Slate 200 */
 }
 
 .emoji-opt.selected {
@@ -522,10 +562,12 @@ body {
 }
 
 .month-block {
-    background: rgba(255, 255, 255, 0.02);
+    background: #f8fafc;
+    /* Slate 50 */
     border-radius: 12px;
     padding: 1rem;
     width: 100%;
+    border: 1px solid #e2e8f0;
 }
 
 
@@ -554,25 +596,26 @@ body {
 .mini-day {
     aspect-ratio: 1;
     border-radius: 4px;
-    /* Rounder */
-    background: rgba(255, 255, 255, 0.03);
+    background: #f1f5f9;
+    /* Slate 100 */
     cursor: pointer;
     position: relative;
     font-size: 0.7rem;
-    /* Readable text */
     display: flex;
-    /* Centering text */
     align-items: center;
     justify-content: center;
     color: var(--text-secondary);
-    transition: transform 0.1s;
+    transition: all 0.2s ease;
 }
 
 .mini-day:hover {
     transform: scale(1.1);
     z-index: 10;
-    border: 1px solid rgba(255, 255, 255, 0.5);
-    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid #3b82f6;
+    /* Blue Border */
+    background: #bfdbfe;
+    /* Blue 200 */
+    color: #1e3a8a;
 }
 
 .mini-day.empty {
@@ -601,6 +644,9 @@ body {
     left: 50%;
     transform: translateX(-50%);
     background: #0f172a;
+    /* Dark Slate Background */
+    color: #f8fafc;
+    /* Light Text for Contrast */
     border: 1px solid #334155;
     padding: 0.5rem;
     border-radius: 6px;
@@ -609,7 +655,7 @@ body {
     z-index: 20;
     pointer-events: none;
     margin-bottom: 5px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 /* Mobile Header (Hidden on Desktop) */
@@ -748,5 +794,102 @@ body {
         margin: 1rem;
         max-height: 85vh;
         overflow-y: auto;
+    }
+
+    /* Habit Item Mobile Fixes */
+    .habit-item {
+        padding: 0.75rem 1rem;
+        gap: 0.5rem;
+        align-items: center;
+    }
+
+    .habit-left {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .habit-emoji {
+        width: 40px;
+        height: 40px;
+        font-size: 1.25rem;
+        flex-shrink: 0;
+    }
+
+    .habit-details {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .habit-details h4 {
+        /* Allow wrapping for full name visibility */
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+        max-width: 100%;
+        margin-bottom: 0.1rem;
+        line-height: 1.3;
+    }
+
+    .habit-streak {
+        white-space: nowrap;
+        font-size: 0.75rem;
+    }
+
+    /* Target the button container (last child) */
+    .habit-item>div:last-child {
+        flex-shrink: 0;
+        gap: 0.5rem;
+    }
+
+    /* Restore Edit Button Text */
+    .edit-btn {
+        margin-right: 0.25rem !important;
+        padding: 0.3rem 0.6rem !important;
+        font-size: 0.75rem !important;
+        background: rgba(255, 255, 255, 0.5);
+        /* Slight bg for visibility */
+        border: 1px solid #cbd5e1;
+    }
+
+    .edit-btn i {
+        width: 14px;
+        height: 14px;
+        margin-right: 4px;
+        /* Space for text */
+    }
+
+    .check-btn {
+        width: 36px;
+        height: 36px;
+    }
+
+    /* Mobile Calendar Fixes */
+    .calendar-wrapper {
+        gap: 0.5rem;
+        /* Reduce gap */
+    }
+
+    .cal-nav-arrow {
+        width: 32px;
+        /* Smaller arrows */
+        height: 32px;
+        padding: 0;
+        border-radius: 50%;
+    }
+
+    /* Ensure Month Block takes full width available */
+    .year-container.single-month-view .month-block {
+        width: 100%;
+        max-width: none;
+        padding: 0.75rem;
+        /* Reduce internal padding */
+    }
+
+    /* Ensure Nav Buttons do not shrink */
+    .cal-nav-arrow {
+        flex-shrink: 0;
     }
 }
