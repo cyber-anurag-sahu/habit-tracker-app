@@ -11,8 +11,7 @@ const App = {
 
         // Setup Date & Day Checker
         this.updateDateDisplay();
-        // Setup Date & Day Checker
-        this.updateDateDisplay();
+        this.startClock();
         this.startDayChecker();
         this.startReminderChecker();
         this.registerServiceWorker();
@@ -82,6 +81,7 @@ const App = {
         this.dom = {
             habitList: document.getElementById('habit-list'),
             dateDisplay: document.getElementById('current-date'),
+            currentTime: document.getElementById('current-time'),
             statCompleted: document.getElementById('stat-completed'),
             statStreak: document.getElementById('stat-streak'),
             statEfficiency: document.getElementById('stat-efficiency'),
@@ -861,7 +861,7 @@ const App = {
             this.dom.habitList.innerHTML = `
                 <div class="empty-state" style="text-align:center; color:var(--text-secondary); padding:2rem;">
                     <i data-lucide="clipboard-list" style="width:48px;height:48px;margin-bottom:1rem;opacity:0.5;"></i>
-                    <p>No habits yet. Click "New Habit" to start!</p>
+                    <p>No habits yet. Click "Add New Habit" to start!</p>
                 </div>
             `;
             lucide.createIcons();
@@ -998,6 +998,21 @@ const App = {
             const options = { weekday: 'long', month: 'long', day: 'numeric' };
             this.dom.dateDisplay.textContent = new Date().toLocaleDateString('en-US', options);
         }
+    },
+
+    updateTimeDisplay() {
+        if (this.dom.currentTime) {
+            this.dom.currentTime.textContent = new Date().toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+        }
+    },
+
+    startClock() {
+        this.updateTimeDisplay();
+        setInterval(() => this.updateTimeDisplay(), 1000);
     },
 
     startDayChecker() {
