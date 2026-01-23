@@ -145,9 +145,18 @@ window.Store = {
         };
 
         try {
-            const docRef = await db.collection('users').doc(this.userId).collection('habits').add(newHabit);
+            // Calendar Integration
+            let calendarEventId = null;
+            if (hasReminder && time && CalendarService && CalendarService.isConnected) {
+                calendarEventId = await CalendarService.createEvent(newHabit);
+            }
+
+            const habitToStore = { ...newHabit, calendarEventId };
+
+            const docRef = await db.collection('users').doc(this.userId).collection('habits').add(habitToStore);
+
             // Update local state
-            const habitWithId = { id: docRef.id, ...newHabit };
+            const habitWithId = { id: docRef.id, ...habitToStore };
             this.habits.push(habitWithId);
             this.touchActivity(); // Notify Admin of activity
             return habitWithId;
@@ -188,12 +197,33 @@ window.Store = {
         };
 
         try {
-            await db.collection('users').doc(this.userId).collection('habits').doc(id).update(timeData);
+            // Calendar Update Strategy: Delete Old -> Create New (Simpler than patch)
+            let calendarEventId = null;
+            const habit = this.habits.find(h => h.id === id);
+
+            if (CalendarService && CalendarService.isConnected) {
+                // If existing event, remove it
+                if (habit && habit.calendarEventId) {
+                    await CalendarService.deleteEvent(habit.calendarEventId);
+                }
+
+                // If reminder is active, create new
+                if (hasReminder && time) {
+                    calendarEventId = await CalendarService.createEvent({ name, emoji, time, hasReminder });
+                }
+            } else {
+                // Preserve old ID if not connected, though this might desync. 
+                // Better to clear it if we can't manage it? No, keeping it is safer.
+                if (habit) calendarEventId = habit.calendarEventId;
+            }
+
+            const finalData = { ...timeData, calendarEventId };
+
+            await db.collection('users').doc(this.userId).collection('habits').doc(id).update(finalData);
 
             // Update local state
-            const habit = this.habits.find(h => h.id === id);
             if (habit) {
-                Object.assign(habit, timeData);
+                Object.assign(habit, finalData);
             }
             this.touchActivity(); // Notify Admin
         } catch (e) {
@@ -205,6 +235,12 @@ window.Store = {
         if (!this.userId) return;
 
         try {
+            // Calendar Cleanup
+            const habit = this.habits.find(h => h.id === id);
+            if (habit && habit.calendarEventId && CalendarService && CalendarService.isConnected) {
+                await CalendarService.deleteEvent(habit.calendarEventId);
+            }
+
             await db.collection('users').doc(this.userId).collection('habits').doc(id).delete();
             this.habits = this.habits.filter(h => h.id !== id);
             this.touchActivity(); // Notify Admin of activity

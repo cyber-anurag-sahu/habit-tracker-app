@@ -15,6 +15,9 @@ const App = {
         this.startDayChecker();
         this.startReminderChecker();
         this.registerServiceWorker();
+        this.startReminderChecker();
+        this.registerServiceWorker();
+        // CalendarService.init() removed - loaded per user now
 
         this.adminUnsub = null;
 
@@ -41,6 +44,9 @@ const App = {
                     this.dom.userAvatar.src = user.photoURL || `https://ui-avatars.com/api/?name=${name}&background=6366f1&color=fff`;
                 }
 
+                // Load Calendar Session for this User
+                CalendarService.loadSession(user.uid);
+
                 // Load Data
                 const success = await Store.load(user, this.pendingReferralCode);
                 // Clear after use
@@ -49,6 +55,16 @@ const App = {
                 if (success) {
                     this.render();
                     Charts.render();
+
+                    // Check Calendar Connection
+                    // Check Calendar Connection
+                    // Removed updateCalendarUI call since function was deleted
+                    if (!CalendarService.isConnected) {
+                        // Optional: Validate if the token is still good
+                        CalendarService.validateConnection().then(isValid => {
+                            if (!isValid) CalendarService.setToken(null);
+                        });
+                    }
 
                     // Show Admin Button if applicable
                     const adminBtn = document.getElementById('nav-admin-btn');
@@ -72,6 +88,7 @@ const App = {
                 }
             } else {
                 console.log('User logged out');
+                CalendarService.reset(); // Clear calendar state
                 this.dom.loginOverlay.classList.remove('hidden'); // Show login screen
             }
         });
@@ -115,6 +132,13 @@ const App = {
             emailAuthBtn: document.getElementById('email-auth-btn'),
             authToggleBtn: document.getElementById('auth-toggle-btn'),
             authToggleText: document.getElementById('auth-toggle-text'),
+            habitTimeMinute: document.getElementById('habit-time-minute'),
+            habitTimeAmpm: document.getElementById('habit-time-ampm'),
+            habitReminderBtn: document.getElementById('habit-reminder-btn'),
+            habitReminderText: document.getElementById('habit-reminder-text'),
+            habitReminderTrack: document.getElementById('habit-reminder-track'),
+            habitReminderKnob: document.getElementById('habit-reminder-knob'),
+
             forgotPasswordBtn: document.getElementById('forgot-password-btn'),
 
             // User Profile Elements
@@ -143,7 +167,11 @@ const App = {
 
             // Announcement
             announcementBanner: document.getElementById('announcement-banner'),
-            announcementText: document.getElementById('announcement-text')
+            announcementText: document.getElementById('announcement-text'),
+
+            // Modal Prompt
+            calendarPrompt: document.getElementById('calendar-prompt'),
+            modalConnectBtn: document.getElementById('modal-connect-calendar-btn')
         };
 
         // Date Setup moved to updateDateDisplay
@@ -369,19 +397,21 @@ const App = {
                 const isActive = this.dom.habitReminderBtn.dataset.active === 'true';
 
                 if (!isActive) {
-                    // Turning ON
-                    if (Notification.permission !== "granted") {
-                        Notification.requestPermission().then(permission => {
-                            if (permission === "granted") {
-                                console.log("Notification permission granted");
-                                this.toggleReminderState(true);
-                            }
-                        });
-                    } else {
+                    // Turn ON
+                    if (CalendarService && CalendarService.isConnected) {
                         this.toggleReminderState(true);
+                    } else {
+                        // Not connected? Trigger Auth Flow
+                        if (confirm("Connect Google Calendar to enable reliable background reminders?")) {
+                            this.handleConnectCalendar().then(() => {
+                                if (CalendarService.isConnected) {
+                                    this.toggleReminderState(true);
+                                }
+                            });
+                        }
                     }
                 } else {
-                    // Turning OFF
+                    // Turn OFF
                     this.toggleReminderState(false);
                 }
             });
@@ -446,7 +476,35 @@ const App = {
                 if (e.target === this.dom.inspectorModal) this.dom.inspectorModal.classList.add('hidden');
             });
         }
+
     },
+
+    async handleConnectCalendar() {
+        if (!auth.currentUser) return;
+
+        const provider = new firebase.auth.GoogleAuthProvider();
+        provider.addScope('https://www.googleapis.com/auth/calendar.events');
+
+        try {
+            // We use linkWithPopup or reauthenticate
+            // Let's try reauth first as it's safer for existing users
+            // Or if we just want the token, we can use signInWithPopup again, but that might re-trigger auth flow
+            const result = await auth.currentUser.reauthenticateWithPopup(provider);
+            const credential = result.credential;
+            const accessToken = credential.accessToken;
+
+            if (accessToken) {
+                CalendarService.setToken(accessToken);
+                alert("Google Calendar Connected! Future habits will be synced.");
+                // updateCalendarUI(true); // removed
+            }
+        } catch (error) {
+            console.error("Calendar Auth Error:", error);
+            alert("Connection failed: " + error.message);
+        }
+    },
+
+    // updateCalendarUI removed
 
     switchView(viewName) {
         // Update Buttons
@@ -1077,18 +1135,51 @@ const App = {
         if (!this.dom.habitReminderBtn) return;
 
         if (isActive) {
+            // Button Style
             this.dom.habitReminderBtn.dataset.active = 'true';
             this.dom.habitReminderBtn.style.background = 'var(--accent)';
             this.dom.habitReminderBtn.style.color = '#fff';
             this.dom.habitReminderBtn.style.borderColor = 'var(--accent)';
-            this.dom.habitReminderText.textContent = "Reminder Set";
-            // Update icon color logic if needed, but text color handles it
+            this.dom.habitReminderBtn.style.opacity = '1';
+            this.dom.habitReminderText.textContent = "Synced with Google Calendar";
+
+            // Toggle Animation (ON)
+            if (this.dom.habitReminderKnob) {
+                this.dom.habitReminderKnob.style.transform = 'translateX(20px)';
+                this.dom.habitReminderKnob.style.background = '#fff';
+            }
+            if (this.dom.habitReminderTrack) {
+                this.dom.habitReminderTrack.style.background = 'rgba(0,0,0,0.2)';
+            }
+
+            lucide.createIcons({
+                nameAttr: 'data-lucide',
+                attrs: { class: "lucide lucide-check" },
+                root: this.dom.habitReminderBtn
+            });
         } else {
+            // Button Style
             this.dom.habitReminderBtn.dataset.active = 'false';
             this.dom.habitReminderBtn.style.background = 'var(--bg-color)';
             this.dom.habitReminderBtn.style.color = 'var(--text-secondary)';
             this.dom.habitReminderBtn.style.borderColor = 'var(--border-color)';
-            this.dom.habitReminderText.textContent = "Enable Reminder";
+            this.dom.habitReminderBtn.style.opacity = '0.7';
+            this.dom.habitReminderText.textContent = "Add to Google Calendar";
+
+            // Toggle Animation (OFF)
+            if (this.dom.habitReminderKnob) {
+                this.dom.habitReminderKnob.style.transform = 'translateX(0)';
+                this.dom.habitReminderKnob.style.background = 'var(--text-secondary)';
+            }
+            if (this.dom.habitReminderTrack) {
+                this.dom.habitReminderTrack.style.background = 'rgba(255,255,255,0.1)';
+            }
+
+            lucide.createIcons({
+                nameAttr: 'data-lucide',
+                attrs: { class: "lucide lucide-calendar" },
+                root: this.dom.habitReminderBtn
+            });
         }
     },
 
@@ -1104,6 +1195,7 @@ const App = {
         if (Notification.permission !== "granted") return;
 
         const now = new Date();
+        // Ensure 24-hour format matching input (00-23)
         const hours = String(now.getHours()).padStart(2, '0');
         const minutes = String(now.getMinutes()).padStart(2, '0');
         const currentTime = `${hours}:${minutes}`;
@@ -1121,31 +1213,36 @@ const App = {
         }
 
         habits.forEach(h => {
+            // Need to handle null time or non-reminder habits
             if (h.hasReminder && h.time === currentTime) {
+                const title = `Time for ${h.name}!`;
+                const options = {
+                    body: `Don't forget to ${h.name} ${h.emoji || '⚡'}`,
+                    icon: '/icon-192.png', // Ensure this exists or use a remote URL
+                    badge: '/icon-192.png',
+                    requireInteraction: true,
+                    data: { habitId: h.id },
+                    actions: [
+                        { action: 'done', title: 'Done' }
+                    ]
+                };
+
                 if (reg) {
                     // Show Actionable Notification via SW
-                    reg.showNotification(`Time for ${h.name}!`, {
-                        body: `Don't forget to ${h.name} ${h.emoji}`,
-                        icon: 'https://cdn-icons-png.flaticon.com/512/2693/2693507.png',
-                        requireInteraction: true,
-                        data: { habitId: h.id },
-                        actions: [
-                            { action: 'done', title: 'Done' },
-                            { action: 'cancel', title: 'Cancel' }
-                        ]
-                    });
+                    reg.showNotification(title, options).catch(err => console.error("SW Notification failed", err));
                 } else {
                     // Fallback: Standard Notification (No Buttons)
-                    const n = new Notification(`Time for ${h.name}!`, {
-                        body: `Don't forget to ${h.name} ${h.emoji}`,
-                        icon: 'https://cdn-icons-png.flaticon.com/512/2693/2693507.png',
-                        requireInteraction: true
-                    });
-                    setTimeout(() => n.close(), 7000);
+                    const n = new Notification(title, options);
+                    n.onclick = () => {
+                        window.focus();
+                        n.close();
+                    };
                 }
             }
         });
     },
+
+    // sendTestNotification Removed
 
     async handlePasswordReset(email) {
         if (!email) {
