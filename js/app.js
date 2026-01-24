@@ -19,6 +19,8 @@ const App = {
         this.registerServiceWorker();
         // CalendarService.init() removed - loaded per user now
 
+        if (window.Budget) Budget.init();
+
         this.adminUnsub = null;
 
         // Auth Listener
@@ -535,6 +537,9 @@ const App = {
 
         if (viewName === 'analytics') {
             Charts.render();
+        } else if (viewName === 'budget') {
+            console.log("App: Switching to Budget View");
+            Budget.render();
         } else if (viewName === 'admin') {
             this.renderAdmin();
         }
@@ -876,28 +881,74 @@ const App = {
                 this.dom.inspectorTitle.textContent = `Inspecting: ${name}`;
                 this.dom.inspectorContent.innerHTML = '<p style="color:var(--text-secondary)">Loading user data...</p>';
 
-                // Fetch Data
-                const habits = await Store.getUserHabits(uid);
+                // Fetch Data Parallel
+                const [habits, transactions, budgetLimit] = await Promise.all([
+                    Store.getUserHabits(uid),
+                    Store.getUserTransactions(uid),
+                    Store.getUserBudgetLimit(uid)
+                ]);
+
+                // Calculate Stats
+                let totalSpent = 0;
+                let totalIncome = 0;
+                transactions.forEach(t => {
+                    if (t.type === 'expense') totalSpent += t.amount;
+                    else totalIncome += t.amount;
+                });
+
+                // Format Money Helper
+                const fmt = (n) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(n);
+
+                // Build HTML
+                let html = `<div style="display:grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 1rem;">
+                    <div style="background: rgba(255,255,255,0.05); padding: 0.8rem; border-radius: 8px;">
+                        <span style="font-size:0.75rem; color:var(--text-secondary);">Budget Goal</span>
+                        <div style="font-weight:bold; font-size:1.1rem;">${fmt(budgetLimit)}</div>
+                    </div>
+                     <div style="background: rgba(255,255,255,0.05); padding: 0.8rem; border-radius: 8px;">
+                        <span style="font-size:0.75rem; color:var(--text-secondary);">Total Spent</span>
+                        <div style="font-weight:bold; font-size:1.1rem; color:var(--danger);">${fmt(totalSpent)}</div>
+                    </div>
+                </div>`;
+
+                html += `<h4 style="margin-bottom:0.5rem; border-bottom:1px solid var(--glass-border); padding-bottom:0.2rem;">Habits (${habits.length})</h4>`;
 
                 if (habits.length === 0) {
-                    this.dom.inspectorContent.innerHTML = '<p style="text-align:center; padding:1rem;">No habits found for this user.</p>';
+                    html += '<p style="text-align:center; padding:0.5rem; font-size:0.9rem; color:var(--text-secondary);">No habits found.</p>';
                 } else {
-                    this.dom.inspectorContent.innerHTML = habits.map(h => {
-                        // Calc Streak
+                    html += habits.map(h => {
                         const streak = Store.calculateStreak(h);
                         return `
-                            <div style="background: rgba(255,255,255,0.05); padding: 0.75rem; border-radius: 8px; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
+                            <div style="padding: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: space-between;">
                                 <div style="display:flex; align-items:center; gap:0.5rem;">
                                     <span>${h.emoji}</span>
-                                    <strong>${h.name}</strong>
+                                    <span>${h.name}</span>
                                 </div>
-                                <div style="color: var(--accent); font-size: 0.9rem;">
-                                    🔥 ${streak} day streak
-                                </div>
+                                <span style="font-size: 0.8rem; color: var(--accent);">🔥 ${streak}</span>
                             </div>
                          `;
                     }).join('');
                 }
+
+                html += `<h4 style="margin-top:1rem; margin-bottom:0.5rem; border-bottom:1px solid var(--glass-border); padding-bottom:0.2rem;">Recent Transactions</h4>`;
+
+                if (transactions.length === 0) {
+                    html += '<p style="text-align:center; padding:0.5rem; font-size:0.9rem; color:var(--text-secondary);">No transactions found.</p>';
+                } else {
+                    // Show last 5
+                    const recent = transactions.sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5);
+                    html += recent.map(t => {
+                        const isExp = t.type === 'expense';
+                        return `
+                             <div style="padding: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: space-between; font-size:0.9rem;">
+                                <span>${t.description}</span>
+                                <span style="color: ${isExp ? 'var(--danger)' : 'var(--success)'};">${isExp ? '-' : '+'} ${fmt(t.amount)}</span>
+                            </div>
+                        `;
+                    }).join('');
+                }
+
+                this.dom.inspectorContent.innerHTML = html;
             };
         });
     },

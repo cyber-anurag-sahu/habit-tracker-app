@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orbit - Daily Habit Tracker</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="css/style.css">
+
+    <!-- Firebase SDKs (Compat) -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+</head>
+
+<body>
+    <!-- Mobile Overlay -->
+    <div id="mobile-overlay" class="mobile-overlay"></div>
+
+    <div class="app-container">
+        <!-- Mobile Header -->
+        <header class="mobile-header">
+            <div class="brand">
+                <i data-lucide="orbit" class="logo-icon" style="width: 24px; height: 24px; color: var(--accent);"></i>
+                <h1 style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary); margin-left: 0.5rem;">Orbit
+                </h1>
+            </div>
+            <button id="mobile-toggle" class="mobile-toggle">
+                <i data-lucide="menu" style="width: 24px; height: 24px;"></i>
+            </button>
+        </header>
+        <!-- Sidebar / Header -->
+        <header class="sidebar">
+            <button id="close-sidebar" class="close-sidebar-btn">
+                <i data-lucide="x"></i>
+            </button>
+            <!-- Announcement Banner -->
+            <div id="announcement-banner"
+                style="display: none; background: var(--accent-gradient); padding: 1rem; border-radius: 12px; margin-bottom: 2rem; align-items: center; justify-content: space-between; color: white; box-shadow: 0 4px 20px var(--accent-glow);">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <i data-lucide="megaphone"></i>
+                    <p id="announcement-text" style="font-weight: 500; margin: 0;">System Message</p>
+                </div>
+            </div>
+
+            <div class="header" id="dashboard-header">
+                <i data-lucide="orbit" class="logo-icon"></i>
+                <h1>Orbit</h1>
+            </div>
+
+            <div class="user-greeting">
+                <p class="subtext">Welcome back</p>
+                <h2 id="greeting-time">Ready to grow?</h2>
+            </div>
+
+            <nav>
+                <button class="nav-btn active" data-view="dashboard">
+                    <i data-lucide="layout-grid"></i> Dashboard
+                </button>
+                <button class="nav-btn" data-view="analytics">
+                    <i data-lucide="bar-chart-2"></i> Analytics
+                </button>
+                <button id="nav-admin-btn" class="nav-btn" data-view="admin" style="display: none;">
+                    <i data-lucide="shield"></i> Admin
+                </button>
+            </nav>
+
+            <div id="user-profile-section" class="user-profile"
+                style="margin-top: auto; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: var(--bg-color); border-radius: 12px; width: 100%;">
+                <img id="user-avatar" src="https://ui-avatars.com/api/?name=User&background=3b82f6&color=fff"
+                    style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(255,255,255,0.1);">
+                <div style="flex: 1; overflow: hidden;">
+                    <p id="user-display-name"
+                        style="font-size: 0.9rem; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                        User</p>
+                    <button id="logout-btn"
+                        style="background: none; border: none; padding: 0; color: var(--danger); font-size: 0.75rem; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 4px; margin-top: 2px;">
+                        <i data-lucide="log-out" style="width: 12px; height: 12px;"></i> Log Out
+                    </button>
+                </div>
+            </div>
+
+            <div class="quote-card" style="margin-top: 0;">
+                <p id="daily-quote">"Consistency is the key to achieving and maintaining momentum."</p>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+
+            <!-- Dashboard View -->
+            <div id="view-dashboard" class="view active">
+                <div class="header-actions">
+                    <div class="date-display">
+                        <h2 id="current-day">Today</h2>
+                        <span id="current-date">...</span>
+                        <span id="current-time"
+                            style="margin-left: 0.8rem; color: var(--accent); font-weight: 600;"></span>
+                    </div>
+                    <button id="add-habit-btn" class="btn-primary">
+                        <i data-lucide="plus"></i> Add New Habit
+                    </button>
+                </div>
+
+                <!-- Stats Overview -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="icon-box"><i data-lucide="check-circle-2"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-label">Completed Today</span>
+                            <h3 class="stat-value" id="stat-completed">0/0</h3>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="icon-box fire"><i data-lucide="flame"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-label">Best Streak</span>
+                            <h3 class="stat-value" id="stat-streak">0 days</h3>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="icon-box percent"><i data-lucide="pie-chart"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-label">Efficiency</span>
+                            <h3 class="stat-value" id="stat-efficiency">0%</h3>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Habit List -->
+                <div class="habits-section">
+                    <h3>Your Habits</h3>
+                    <div id="habit-list" class="habit-list">
+                        <!-- Habits will be injected here -->
+                        <div class="empty-state">
+                            <p>No habits yet. Start small!</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analytics View -->
+            <div id="view-analytics" class="view hidden">
+                <div class="header-actions">
+                    <h2>Performance</h2>
+                </div>
+                <div class="charts-container">
+                    <div class="chart-card">
+                        <h3>Weekly Completion</h3>
+                        <div class="chart-box">
+                            <canvas id="weeklyChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Monthly Consistency</h3>
+                        <div class="chart-box">
+                            <canvas id="monthlyChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Heatmap Calendar -->
+                <div class="heatmap-section">
+                    <div class="calendar-controls">
+                        <h3>Monthly Progress</h3>
+                        <!-- We can keep year-selector if we want to jump years, but for now focusing on month nav -->
+                        <div class="year-selector-group">
+                            <!-- Hidden or removed old controls if user only wants 2-month nav with arrows -->
+                        </div>
+                    </div>
+
+                    <div class="calendar-wrapper">
+                        <button id="month-prev" class="cal-nav-arrow"><i data-lucide="chevron-left"></i></button>
+
+                        <div id="year-container" class="year-container single-month-view">
+                            <!-- Month injected here -->
+                        </div>
+
+                        <button id="month-next" class="cal-nav-arrow"><i data-lucide="chevron-right"></i></button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Admin View -->
+            <div id="view-admin" class="view hidden">
+                <div class="header-actions">
+                    <h2>Admin Panel</h2>
+                    <div style="display:flex; gap:0.5rem;">
+                        <button id="admin-refresh-btn" class="btn-icon" title="Refresh List"
+                            style="background: var(--card-bg); border: var(--glass-border);">
+                            <i data-lucide="refresh-cw"></i>
+                        </button>
+                        <button id="admin-add-user-btn" class="btn-icon" title="Add Missing User"
+                            style="background: var(--card-bg); border: var(--glass-border);">
+                            <i data-lucide="user-plus"></i>
+                        </button>
+                        <button id="admin-email-btn" class="btn-primary" style="background: var(--accent);">
+                            <i data-lucide="mail"></i> Bulk Email
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Admin Stats -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="icon-box"><i data-lucide="users"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-label">Total Users</span>
+                            <h3 class="stat-value" id="admin-total-users">0</h3>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="icon-box percent"><i data-lucide="activity"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-label">Active (24h)</span>
+                            <h3 class="stat-value" id="admin-active-users">0</h3>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Communications -->
+                <div class="habits-section" style="margin-top: 2rem;">
+                    <h3>Global Announcement</h3>
+                    <div
+                        style="background: var(--card-bg); border: var(--glass-border); border-radius: 12px; padding: 1rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <input type="text" id="admin-announcement-input" placeholder="Type a broadcast message..."
+                            style="flex: 1; min-width: 200px; padding: 0.8rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-primary); outline: none;">
+                        <select id="admin-announcement-type"
+                            style="padding: 0.8rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-primary);">
+                            <option value="info">Info (Purple)</option>
+                            <option value="alert">Alert (Red)</option>
+                            <option value="success">Success (Green)</option>
+                        </select>
+                        <button id="admin-post-announcement" class="btn-primary">Post</button>
+                        <button id="admin-clear-announcement" class="btn-icon" title="Clear"><i
+                                data-lucide="trash-2"></i></button>
+                    </div>
+                </div>
+
+                <!-- User Directory -->
+                <div class="habits-section" style="margin-top: 2rem;">
+                    <h3>User Directory</h3>
+
+                    <!-- Search Bar -->
+                    <div style="margin-bottom: 1rem;">
+                        <div style="position: relative; max-width: 400px;">
+                            <i data-lucide="search"
+                                style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: var(--text-secondary); width: 18px; height: 18px;"></i>
+                            <input type="text" id="admin-user-search" placeholder="Search by name or email..."
+                                style="width: 100%; padding: 0.8rem 0.8rem 0.8rem 2.8rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-primary); outline: none;">
+                        </div>
+                    </div>
+
+                    <div class="table-container"
+                        style="overflow-x: auto; background: var(--card-bg); border-radius: 16px; border: var(--glass-border); padding: 1rem;">
+                        <table style="width: 100%; border-collapse: collapse; min-width: 600px;">
+                            <thead>
+                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+                                    <th
+                                        style="text-align: left; padding: 1rem; color: var(--text-secondary); font-weight: 500;">
+                                        User</th>
+                                    <th
+                                        style="text-align: left; padding: 1rem; color: var(--text-secondary); font-weight: 500;">
+                                        Email</th>
+                                    <th
+                                        style="text-align: left; padding: 1rem; color: var(--text-secondary); font-weight: 500;">
+                                        Last Active</th>
+                                    <th
+                                        style="text-align: right; padding: 1rem; color: var(--text-secondary); font-weight: 500;">
+                                        Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-user-list">
+                                <!-- Users injected here -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Pagination Controls -->
+                    <div id="admin-user-pagination"
+                        style="display: flex; align-items: center; justify-content: flex-end; gap: 1rem; margin-top: 1rem;">
+                        <button id="user-page-prev" class="btn-icon" disabled
+                            style="background: var(--card-bg); border: var(--glass-border);">
+                            <i data-lucide="chevron-left"></i>
+                        </button>
+                        <span id="user-page-info"
+                            style="color: var(--text-secondary); font-variant-numeric: tabular-nums;">
+                            Page 1 of 1
+                        </span>
+                        <button id="user-page-next" class="btn-icon" disabled
+                            style="background: var(--card-bg); border: var(--glass-border);">
+                            <i data-lucide="chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+
+
+                <!-- Referral Manager -->
+                <div class="habits-section" style="margin-top: 2rem;">
+                    <h3>Referral System</h3>
+
+                    <!-- Creator -->
+                    <div
+                        style="background: var(--card-bg); border: var(--glass-border); border-radius: 12px; padding: 1rem; margin-bottom: 1rem;">
+                        <h4 style="margin-bottom: 0.5rem; color: var(--text-secondary);">Create New Code</h4>
+                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                            <input type="text" id="admin-ref-code-input" placeholder="Code (e.g. SUMMER25)"
+                                style="flex: 1; padding: 0.8rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-primary); outline: none; text-transform: uppercase;">
+                            <input type="email" id="admin-ref-email-input" placeholder="Influencer Email"
+                                style="flex: 1; padding: 0.8rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-primary); outline: none;">
+                            <button id="admin-create-ref-btn" class="btn-primary">Create</button>
+                        </div>
+                    </div>
+
+                    <!-- Chart -->
+                    <div class="chart-card" style="margin-bottom: 1rem;">
+                        <h3>Top Referrers</h3>
+                        <div class="chart-box" style="height: 250px;">
+                            <canvas id="referralChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- List -->
+                    <div class="table-container"
+                        style="overflow-x: auto; background: var(--card-bg); border-radius: 16px; border: var(--glass-border); padding: 1rem;">
+                        <table style="width: 100%; border-collapse: collapse; min-width: 600px;">
+                            <thead>
+                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+                                    <th style="text-align: left; padding: 1rem; color: var(--text-secondary);">Code</th>
+                                    <th style="text-align: left; padding: 1rem; color: var(--text-secondary);">Owner
+                                    </th>
+                                    <th style="text-align: right; padding: 1rem; color: var(--text-secondary);">
+                                        Referrals
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-referral-list">
+                                <!-- Referrals injected here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Create Habit Modal -->
+    <div id="modal-overlay" class="modal-overlay hidden">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Create New Habit</h3>
+                <button id="close-modal" class="btn-icon"><i data-lucide="x"></i></button>
+            </div>
+            <form id="habit-form">
+                <div class="form-group">
+                    <label>Habit Name</label>
+                    <input type="text" id="habit-name" placeholder="e.g. Read 10 pages" required maxlength="60">
+                </div>
+
+                <div class="form-group">
+                    <label>Reminder Time</label>
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                        <!-- Hour -->
+                        <select id="habit-time-hour"
+                            style="padding: 0.8rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-primary); cursor:pointer;">
+                            <option value="01">01</option>
+                            <option value="02">02</option>
+                            <option value="03">03</option>
+                            <option value="04">04</option>
+                            <option value="05">05</option>
+                            <option value="06">06</option>
+                            <option value="07">07</option>
+                            <option value="08">08</option>
+                            <option value="09" selected>09</option>
+                            <option value="10">10</option>
+                            <option value="11">11</option>
+                            <option value="12">12</option>
+                        </select>
+                        <span style="font-weight:bold;">:</span>
+                        <!-- Minute -->
+                        <select id="habit-time-minute"
+                            style="padding: 0.8rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-primary); cursor:pointer;">
+                            <option value="00" selected>00</option>
+                            <option value="05">05</option>
+                            <option value="10">10</option>
+                            <option value="15">15</option>
+                            <option value="20">20</option>
+                            <option value="25">25</option>
+                            <option value="30">30</option>
+                            <option value="35">35</option>
+                            <option value="40">40</option>
+                            <option value="45">45</option>
+                            <option value="50">50</option>
+                            <option value="55">55</option>
+                        </select>
+                        <!-- AM/PM -->
+                        <select id="habit-time-ampm"
+                            style="padding: 0.8rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-primary); cursor:pointer;">
+                            <option value="AM" selected>AM</option>
+                            <option value="PM">PM</option>
+                        </select>
+                    </div>
+
+                    <button type="button" id="habit-reminder-btn"
+                        style="width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 0.8rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-secondary); cursor: pointer; margin-top: 0.5rem; transition: all 0.2s;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem; pointer-events: none;">
+                            <i data-lucide="calendar" style="width: 18px; height: 18px;"></i>
+                            <span id="habit-reminder-text">Add to Google Calendar</span>
+                        </div>
+                        <div id="habit-reminder-track"
+                            style="width: 44px; height: 24px; background: rgba(255,255,255,0.1); border-radius: 12px; position: relative; transition: all 0.2s; pointer-events: none;">
+                            <div id="habit-reminder-knob"
+                                style="position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; background: var(--text-secondary); border-radius: 50%; transition: all 0.2s;">
+                            </div>
+                        </div>
+                    </button>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">Create Habit</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+
+    <!-- User Inspector Modal -->
+    <div id="inspector-modal" class="modal-overlay hidden">
+        <div class="modal" style="width: 500px; max-width: 95%;">
+            <div class="modal-header">
+                <h3 id="inspector-title">User Details</h3>
+                <button id="close-inspector-btn" class="btn-icon"><i data-lucide="x"></i></button>
+            </div>
+            <div id="inspector-content" style="padding-top: 0.5rem;">
+                <p style="color: var(--text-secondary);">Loading...</p>
+            </div>
+        </div>
+    </div>
+
+    </div>
+
+    <!-- Login Overlay -->
+    <div id="login-overlay" class="modal-overlay" style="z-index: 2000; background: var(--bg-color);">
+        <div class="login-card"
+            style="text-align: center; padding: 3rem; background: var(--card-bg); border-radius: 20px; border: var(--glass-border); max-width: 400px; width: 90%;">
+            <i data-lucide="orbit" style="width: 64px; height: 64px; color: var(--accent); margin-bottom: 1.5rem;"></i>
+            <h1 style="margin-bottom: 0.5rem; font-size: 2rem;">Orbit</h1>
+            <p style="color: var(--text-secondary); margin-bottom: 2rem;">Login to sync your habits across devices.</p>
+
+
+            <!-- Email Auth Form -->
+            <div id="email-auth-form" style="width: 100%; margin-bottom: 1rem;">
+                <input type="email" id="email-input" placeholder="Email"
+                    style="width: 100%; padding: 0.8rem; margin-bottom: 0.8rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-primary); outline: none;">
+                <div style="position: relative; width: 100%; margin-bottom: 0.5rem;">
+                    <input type="password" id="password-input" placeholder="Password"
+                        style="width: 100%; padding: 0.8rem; padding-right: 2.5rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-primary); outline: none;">
+                    <button id="toggle-password-btn" type="button" tabindex="-1"
+                        style="position: absolute; right: 0.8rem; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 0; display: flex; align-items: center; justify-content: center;">
+                        <i data-lucide="eye" style="width: 20px; height: 20px;"></i>
+                    </button>
+                </div>
+
+                <!-- Referral Code Input (Only for Signup) -->
+                <div id="referral-input-container" style="display: none; width: 100%; margin-bottom: 0.8rem;">
+                    <input type="text" id="signup-referral-code" placeholder="Referral Code (Optional)"
+                        style="width: 100%; padding: 0.8rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-primary); outline: none; text-transform: uppercase;">
+                </div>
+                <div style="text-align: right; margin-bottom: 1.5rem;">
+                    <button id="forgot-password-btn"
+                        style="background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 0.8rem; font-weight: 500;">Forgot
+                        Password?</button>
+                </div>
+
+                <button id="email-auth-btn" class="btn-primary"
+                    style="width: 100%; justify-content: center; padding: 0.8rem; margin-bottom: 1rem;">
+                    Log In
+                </button>
+
+                <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1.5rem;">
+                    <span id="auth-toggle-text">Don't have an account?</span>
+                    <button id="auth-toggle-btn"
+                        style="background: none; border: none; color: var(--accent); cursor: pointer; padding: 0; font-weight: 500;">Sign
+                        Up</button>
+                </p>
+
+                <div
+                    style="display: flex; align-items: center; justify-content: center; margin-bottom: 1.5rem; width: 100%;">
+                    <div style="height: 1px; background: var(--border-color); flex: 1;"></div>
+                    <span style="padding: 0 10px; color: var(--text-secondary); font-size: 0.8rem;">OR</span>
+                    <div style="height: 1px; background: var(--border-color); flex: 1;"></div>
+                </div>
+            </div>
+
+            <button id="google-login-btn" class="btn-primary"
+                style="width: 100%; justify-content: center; font-size: 1rem; padding: 0.8rem; background: white; border: 1px solid #cbd5e1; color: #0f172a;">
+                <i data-lucide="log-in"></i> Sign in with Google
+            </button>
+        </div>
+    </div>
+
+    <!-- Application Logic -->
+    <script src="js/firebase-config.js"></script>
+    <script src="js/store.js"></script>
+    <script src="js/calendar.js"></script>
+    <script src="js/charts.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+        lucide.createIcons();
+
+        // Mobile Sidebar Toggle Logic
+        const mobileToggle = document.getElementById('mobile-toggle');
+        const sidebar = document.querySelector('.sidebar');
+        const overlay = document.getElementById('mobile-overlay');
+        const closeSidebarBtn = document.getElementById('close-sidebar');
+
+        function toggleSidebar() {
+            sidebar.classList.toggle('open');
+            // Check if there's an overlay element we should toggle
+            if (overlay) {
+                if (sidebar.classList.contains('open')) {
+                    overlay.style.display = 'block';
+                    setTimeout(() => overlay.classList.add('active'), 10);
+                } else {
+                    overlay.classList.remove('active');
+                    setTimeout(() => overlay.style.display = 'none', 300);
+                }
+            }
+        }
+
+        if (mobileToggle) mobileToggle.addEventListener('click', toggleSidebar);
+        if (closeSidebarBtn) closeSidebarBtn.addEventListener('click', toggleSidebar);
+        if (overlay) overlay.addEventListener('click', toggleSidebar);
+
+        // Close sidebar when clicking a nav item on mobile
+        document.querySelectorAll('.nav-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (window.innerWidth <= 768 && sidebar.classList.contains('open')) {
+                    toggleSidebar();
+                }
+            });
+        });
+    </script>
+</body>
+
+</html>

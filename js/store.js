@@ -6,6 +6,7 @@
 window.Store = {
     habits: [],
     occasions: {},
+    transactions: [],
     userId: null,
 
     userId: null,
@@ -45,6 +46,8 @@ window.Store = {
 
         this.habits = [];
         this.occasions = {};
+        this.transactions = [];
+        this.budgetLimit = 0;
 
         try {
             // 1. Fetch Habits
@@ -53,11 +56,26 @@ window.Store = {
                 this.habits.push({ id: doc.id, ...doc.data() });
             });
 
-            // 2. Fetch Occasions
-            const occasionsDoc = await db.collection('users').doc(this.userId).collection('meta').doc('occasions').get();
+            // 2. Fetch Occasions & Budget
+            const metaMethods = [
+                db.collection('users').doc(this.userId).collection('meta').doc('occasions').get(),
+                db.collection('users').doc(this.userId).collection('meta').doc('budget').get()
+            ];
+
+            const [occasionsDoc, budgetDoc] = await Promise.all(metaMethods);
+
             if (occasionsDoc.exists) {
                 this.occasions = occasionsDoc.data();
             }
+            if (budgetDoc.exists) {
+                this.budgetLimit = budgetDoc.data().limit || 0;
+            }
+
+            // 3. Fetch Transactions
+            const transSnap = await db.collection('users').doc(this.userId).collection('transactions').get();
+            transSnap.forEach(doc => {
+                this.transactions.push({ id: doc.id, ...doc.data() });
+            });
 
             console.log('Data Refreshed from Firestore');
             return true;
@@ -269,6 +287,57 @@ window.Store = {
         }
     },
 
+    // --- Transactions ---
+
+    getTransactions() {
+        return this.transactions;
+    },
+
+    async addTransaction(transaction) {
+        if (!this.userId) {
+            console.error("Store: No User ID for addTransaction");
+            return;
+        }
+        console.log("Store: Adding transaction", transaction);
+
+        try {
+            const docRef = await db.collection('users').doc(this.userId).collection('transactions').add(transaction);
+            console.log("Store: Transaction added to Firestore with ID", docRef.id);
+            const transWithId = { id: docRef.id, ...transaction };
+            this.transactions.push(transWithId);
+            this.touchActivity();
+            return transWithId;
+        } catch (e) {
+            console.error("Add transaction failed", e);
+        }
+    },
+
+    async deleteTransaction(id) {
+        if (!this.userId) return;
+
+        try {
+            await db.collection('users').doc(this.userId).collection('transactions').doc(id).delete();
+            this.transactions = this.transactions.filter(t => t.id !== id);
+            this.touchActivity();
+        } catch (e) {
+            console.error("Delete transaction failed", e);
+        }
+    },
+
+    getBudgetLimit() {
+        return this.budgetLimit;
+    },
+
+    async saveBudgetLimit(amount) {
+        if (!this.userId) return;
+        this.budgetLimit = amount;
+        try {
+            await db.collection('users').doc(this.userId).collection('meta').doc('budget').set({ limit: amount });
+        } catch (e) {
+            console.error("Save budget limit failed", e);
+        }
+    },
+
     // --- Admin Features ---
 
     async checkUserExists(uid) {
@@ -403,6 +472,31 @@ window.Store = {
         } catch (e) {
             console.error("Admin: Get User Habits failed", e);
             return [];
+        }
+    },
+
+    // NEW: Get User Transactions for Inspector
+    async getUserTransactions(uid) {
+        if (!this.isAdmin) return [];
+        try {
+            const snap = await db.collection('users').doc(uid).collection('transactions').get();
+            const trans = [];
+            snap.forEach(doc => trans.push({ id: doc.id, ...doc.data() }));
+            return trans;
+        } catch (e) {
+            console.error("Admin: Failed to get user transactions", e);
+            return [];
+        }
+    },
+
+    // NEW: Get User Budget Limit for Inspector
+    async getUserBudgetLimit(uid) {
+        if (!this.isAdmin) return 0;
+        try {
+            const doc = await db.collection('users').doc(uid).collection('meta').doc('budget').get();
+            return doc.exists ? (doc.data().limit || 0) : 0;
+        } catch (e) {
+            return 0;
         }
     },
 
