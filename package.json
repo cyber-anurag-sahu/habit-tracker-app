@@ -21,8 +21,12 @@
   },
   "homepage": "https://github.com/cyber-anurag-sahu/antcode#readme",
   "dependencies": {
+    "@capacitor-firebase/authentication": "^8.0.1",
     "@capacitor/android": "^8.0.1",
     "@capacitor/cli": "^8.0.1",
-    "@capacitor/core": "^8.0.1"
+    "@capacitor/core": "^8.0.1",
+    "@capacitor/local-notifications": "^8.0.0",
+    "esbuild": "^0.27.2",
+    "firebase": "^12.8.0"
   }
 }

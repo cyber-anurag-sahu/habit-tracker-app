@@ -51,3 +51,36 @@ ASSETS_TO_COPY.forEach(item => {
 });
 
 console.log('Build complete. Ready for Capacitor sync.');
+
+// 3. Bundle Auth Bridge
+console.log('Bundling Auth Bridge...');
+try {
+    require('esbuild').buildSync({
+        entryPoints: [path.join(__dirname, 'js', 'auth-bridge.js')],
+        bundle: true,
+        outfile: path.join(BUILD_DIR, 'js', 'auth-bridge.bundle.js'),
+        platform: 'browser',
+        format: 'iife', // Immediately Invoked Function Expression for global side effects
+    });
+    console.log('Auth Bridge bundled successfully.');
+} catch (err) {
+    console.error('Error bundling Auth Bridge:', err);
+    process.exit(1);
+}
+
+// 4. Bundle Notification Service
+console.log('Bundling Notification Service...');
+try {
+    require('esbuild').buildSync({
+        entryPoints: [path.join(__dirname, 'js', 'notifications.js')],
+        bundle: true,
+        outfile: path.join(BUILD_DIR, 'js', 'notifications.bundle.js'),
+        platform: 'browser',
+        format: 'iife',
+    });
+    console.log('Notification Service bundled successfully.');
+} catch (err) {
+    console.error('Error bundling Notification Service:', err);
+    process.exit(1);
+}
+

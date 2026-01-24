@@ -1,5 +1,13 @@
 {
   "appId": "com.antcode.orbit",
   "appName": "Orbit",
-  "webDir": "www"
+  "webDir": "www",
+  "plugins": {
+    "FirebaseAuthentication": {
+      "skipNativeAuth": false,
+      "providers": [
+        "google.com"
+      ]
+    }
+  }
 }

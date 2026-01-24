@@ -1,2 +1,17 @@
 
-admin-tools/service-account.json
+# Node
+node_modules/
+npm-debug.log
+
+# Capacitor / Mobile Build
+www/
+android/app/build/
+android/.gradle/
+android/local.properties
+android/.idea/
+android/app/src/main/assets/public/
+*.class
+
+# OS
+.DS_Store
+Thumbs.db

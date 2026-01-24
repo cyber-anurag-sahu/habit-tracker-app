@@ -15,6 +15,7 @@ window.Store = {
     // Admin List
     ADMIN_EMAILS: ['sahuanurag2109@gmail.com'], // Exclusive Access
     heartbeatInterval: null,
+    listeners: [], // Store cleanup functions
 
     // Helper: Get Local Date String (YYYY-MM-DD)
     getLocalDateString(d = new Date()) {
@@ -24,8 +25,8 @@ window.Store = {
         return `${year}-${month}-${day}`;
     },
 
-    // NEW: Async Load
-    async load(user, referralCode = null) {
+    // NEW: Async Load with Real-time Listeners
+    async load(user, referralCode = null, onDataChange = () => { }) {
         this.userId = user.uid;
 
         const email = user.email ? user.email.toLowerCase() : '';
@@ -33,57 +34,81 @@ window.Store = {
 
         console.log("Admin Check:", email, this.ADMIN_EMAILS, "Result:", this.isAdmin);
 
-        // Sync User Doc (for Admin Directory) - Await to ensure creation
-        // Pass referralCode if present (only used if new user)
-        await this.updateUserRegistry(user, referralCode);
+        // Sync User Doc (for Admin Directory)
+        this.updateUserRegistry(user, referralCode).catch(e => console.error(e));
         this.startUserHeartbeat(user);
 
-        return await this.refresh();
+        // Start Listeners (Instant Cache Load)
+        this.subscribe(onDataChange);
+
+        // Fetch Transactions (Non-blocking background fetch)
+        this.fetchTransactions(onDataChange);
+
+        return true;
     },
 
-    async refresh() {
-        if (!this.userId) return false;
+    subscribe(callback) {
+        if (!this.userId) return;
 
-        this.habits = [];
-        this.occasions = {};
-        this.transactions = [];
-        this.budgetLimit = 0;
+        // Unsubscribe existing
+        this.unsubscribe();
 
-        try {
-            // 1. Fetch Habits
-            const habitsSnap = await db.collection('users').doc(this.userId).collection('habits').get();
-            habitsSnap.forEach(doc => {
-                this.habits.push({ id: doc.id, ...doc.data() });
+        // 1. Habits Listener (Real-time & Offline Cache)
+        const unsubHabits = db.collection('users').doc(this.userId).collection('habits')
+            .onSnapshot(snapshot => {
+                this.habits = [];
+                snapshot.forEach(doc => {
+                    this.habits.push({ id: doc.id, ...doc.data() });
+                });
+                callback('habits');
+            }, error => {
+                console.error("Habits Sync Error:", error);
             });
+        this.listeners.push(unsubHabits);
 
-            // 2. Fetch Occasions & Budget
-            const metaMethods = [
-                db.collection('users').doc(this.userId).collection('meta').doc('occasions').get(),
-                db.collection('users').doc(this.userId).collection('meta').doc('budget').get()
-            ];
+        // 2. Occasions Listener
+        const unsubOccasions = db.collection('users').doc(this.userId).collection('meta').doc('occasions')
+            .onSnapshot(doc => {
+                this.occasions = doc.exists ? doc.data() : {};
+                callback('occasions');
+            }, error => console.error("Occasions Error:", error));
+        this.listeners.push(unsubOccasions);
 
-            const [occasionsDoc, budgetDoc] = await Promise.all(metaMethods);
+        // 3. Budget Listener
+        const unsubBudget = db.collection('users').doc(this.userId).collection('meta').doc('budget')
+            .onSnapshot(doc => {
+                this.budgetLimit = doc.exists ? (doc.data().limit || 0) : 0;
+                callback('budget');
+            }, error => console.error("Budget Error:", error));
+        this.listeners.push(unsubBudget);
+    },
 
-            if (occasionsDoc.exists) {
-                this.occasions = occasionsDoc.data();
-            }
-            if (budgetDoc.exists) {
-                this.budgetLimit = budgetDoc.data().limit || 0;
-            }
+    unsubscribe() {
+        this.listeners.forEach(unsub => unsub());
+        this.listeners = [];
+    },
 
-            // 3. Fetch Transactions
-            const transSnap = await db.collection('users').doc(this.userId).collection('transactions').get();
+    async fetchTransactions(callback = () => { }) {
+        try {
+            // 3. Fetch Transactions (Limited to last 50 for performance)
+            const transSnap = await db.collection('users').doc(this.userId)
+                .collection('transactions')
+                .orderBy('date', 'desc')
+                .limit(50)
+                .get();
+
+            this.transactions = [];
             transSnap.forEach(doc => {
                 this.transactions.push({ id: doc.id, ...doc.data() });
             });
-
-            console.log('Data Refreshed from Firestore');
-            return true;
+            console.log('Transactions fetched');
+            callback('transactions');
         } catch (error) {
-            console.error("Error refreshing data:", error);
-            return false;
+            console.error("Error fetching transactions:", error);
         }
     },
+
+
 
     getHabits() {
         return this.habits;
@@ -163,19 +188,20 @@ window.Store = {
         };
 
         try {
-            // Calendar Integration
-            let calendarEventId = null;
-            if (hasReminder && time && CalendarService && CalendarService.isConnected) {
-                calendarEventId = await CalendarService.createEvent(newHabit);
-            }
-
-            const habitToStore = { ...newHabit, calendarEventId };
+            // Calendar Integration Removed
+            const habitToStore = { ...newHabit };
 
             const docRef = await db.collection('users').doc(this.userId).collection('habits').add(habitToStore);
 
             // Update local state
             const habitWithId = { id: docRef.id, ...habitToStore };
             this.habits.push(habitWithId);
+
+            // Local Notification
+            if (window.NotificationService) {
+                window.NotificationService.schedule(habitWithId);
+            }
+
             this.touchActivity(); // Notify Admin of activity
             return habitWithId;
         } catch (e) {
@@ -214,56 +240,52 @@ window.Store = {
             hasReminder
         };
 
+        // Optimistic Update: Update local immediately
+        const habit = this.habits.find(h => h.id === id);
+        // Snapshot existing logic for rollback (implied simplicity: we won't revert complex logic for now)
+
+        if (habit) {
+            Object.assign(habit, timeData);
+            // Local Notification Re-schedule
+            if (window.NotificationService) {
+                window.NotificationService.schedule(habit);
+            }
+        }
+        this.touchActivity(); // Fire and forget (ish)
+
         try {
-            // Calendar Update Strategy: Delete Old -> Create New (Simpler than patch)
-            let calendarEventId = null;
-            const habit = this.habits.find(h => h.id === id);
+            // Calendar & DB updates in background
 
-            if (CalendarService && CalendarService.isConnected) {
-                // If existing event, remove it
-                if (habit && habit.calendarEventId) {
-                    await CalendarService.deleteEvent(habit.calendarEventId);
-                }
+            // Sync final data
+            await db.collection('users').doc(this.userId).collection('habits').doc(id).update(timeData);
 
-                // If reminder is active, create new
-                if (hasReminder && time) {
-                    calendarEventId = await CalendarService.createEvent({ name, emoji, time, hasReminder });
-                }
-            } else {
-                // Preserve old ID if not connected, though this might desync. 
-                // Better to clear it if we can't manage it? No, keeping it is safer.
-                if (habit) calendarEventId = habit.calendarEventId;
-            }
-
-            const finalData = { ...timeData, calendarEventId };
-
-            await db.collection('users').doc(this.userId).collection('habits').doc(id).update(finalData);
-
-            // Update local state
-            if (habit) {
-                Object.assign(habit, finalData);
-            }
-            this.touchActivity(); // Notify Admin
         } catch (e) {
             console.error("Error updating habit", e);
+            // Ideally rollback here, but for now log error
         }
     },
 
     async deleteHabit(id) {
         if (!this.userId) return;
 
+        // Optimistic: Remove locally first
+        const habit = this.habits.find(h => h.id === id);
+        this.habits = this.habits.filter(h => h.id !== id);
+
+        // Cancel Notification immediately
+        if (window.NotificationService) {
+            window.NotificationService.cancel(id);
+        }
+
         try {
-            // Calendar Cleanup
-            const habit = this.habits.find(h => h.id === id);
-            if (habit && habit.calendarEventId && CalendarService && CalendarService.isConnected) {
-                await CalendarService.deleteEvent(habit.calendarEventId);
-            }
+            // Calendar Cleanup Removed
 
             await db.collection('users').doc(this.userId).collection('habits').doc(id).delete();
-            this.habits = this.habits.filter(h => h.id !== id);
-            this.touchActivity(); // Notify Admin of activity
+            this.touchActivity();
         } catch (e) {
             console.error("Delete failed", e);
+            // Rollback: Re-add habit
+            if (habit) this.habits.push(habit);
         }
     },
 

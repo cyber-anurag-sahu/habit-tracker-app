@@ -1,0 +1,47 @@
+{
+    "project_info": {
+        "project_number": "1028437551709",
+        "project_id": "orbit---daily-habit-tracker",
+        "storage_bucket": "orbit---daily-habit-tracker.firebasestorage.app"
+    },
+    "client": [
+        {
+            "client_info": {
+                "mobilesdk_app_id": "1:1028437551709:android:491400e2bd92df3860fbb4",
+                "android_client_info": {
+                    "package_name": "com.antcode.orbit"
+                }
+            },
+            "oauth_client": [
+                {
+                    "client_id": "1028437551709-4r32k3gc8oriv2v6r2kg1uholemafoj3.apps.googleusercontent.com",
+                    "client_type": 1,
+                    "android_info": {
+                        "package_name": "com.antcode.orbit",
+                        "certificate_hash": "cdccfefebf9b85029150d8c05ec9bc0e9fad0221"
+                    }
+                },
+                {
+                    "client_id": "1028437551709-k1jiqaga5p6qjke4fe3qjdqlhi0364q9.apps.googleusercontent.com",
+                    "client_type": 3
+                }
+            ],
+            "api_key": [
+                {
+                    "current_key": "AIzaSyAy-fSkKNDd5GntCvVbHumfUMkjCLBSJxU"
+                }
+            ],
+            "services": {
+                "appinvite_service": {
+                    "other_platform_oauth_client": [
+                        {
+                            "client_id": "1028437551709-k1jiqaga5p6qjke4fe3qjdqlhi0364q9.apps.googleusercontent.com",
+                            "client_type": 3
+                        }
+                    ]
+                }
+            }
+        }
+    ],
+    "configuration_version": "1"
+}

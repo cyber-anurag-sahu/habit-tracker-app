@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Orbit - Daily Habit Tracker</title>
 
     <!-- Fonts -->
@@ -72,6 +72,9 @@
                 </button>
                 <button class="nav-btn" data-view="analytics">
                     <i data-lucide="bar-chart-2"></i> Analytics
+                </button>
+                <button class="nav-btn" data-view="budget">
+                    <i data-lucide="wallet"></i> Budget Planner
                 </button>
                 <button id="nav-admin-btn" class="nav-btn" data-view="admin" style="display: none;">
                     <i data-lucide="shield"></i> Admin
@@ -190,6 +193,118 @@
                         </div>
 
                         <button id="month-next" class="cal-nav-arrow"><i data-lucide="chevron-right"></i></button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Budget View -->
+            <div id="view-budget" class="view hidden">
+                <div class="header-actions">
+                    <h2>Budget Planner</h2>
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <button id="set-budget-btn" class="btn-primary"
+                            style="background: var(--card-bg); color: var(--text-primary); border: 1px solid var(--border-color); padding: 0.5rem 1rem;">
+                            <i data-lucide="target" style="width: 16px; height: 16px;"></i> Set Monthly Budget
+                        </button>
+                        <button id="export-csv-btn" class="btn-primary"
+                            style="background: var(--card-bg); color: var(--text-primary); border: 1px solid var(--border-color); padding: 0.5rem 1rem;">
+                            Export Your Data
+                        </button>
+                        <button id="add-transaction-btn" class="btn-primary">
+                            <i data-lucide="plus"></i> Add Transaction
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Budget Goal Status -->
+                <div id="budget-status-card" class="stat-card"
+                    style="margin-bottom: 1.5rem; display: block; width: 100%;">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <span class="stat-label">Monthly Budget Goal</span>
+                        <span id="budget-goal-text" style="font-weight: 600; color: var(--text-primary);">Not Set</span>
+                    </div>
+                    <div
+                        style="width: 100%; height: 8px; background: var(--bg-color); border-radius: 4px; overflow: hidden;">
+                        <div id="budget-progress-bar"
+                            style="width: 0%; height: 100%; background: var(--success); transition: width 0.3s;"></div>
+                    </div>
+                    <div
+                        style="display: flex; justify-content: space-between; margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-secondary);">
+                        <span id="budget-spent-text">Spent: ₹0</span>
+                        <span id="budget-remaining-text">Remaining: ₹0</span>
+                    </div>
+                </div>
+
+                <div class="charts-container" style="margin-bottom: 2rem;">
+                    <!-- Budget Summary -->
+                    <div class="chart-card" style="height: auto;">
+                        <h3 style="margin-bottom:1rem;">Overview</h3>
+                        <div class="stats-grid" style="grid-template-columns: 1fr; gap: 1rem; margin-bottom: 0;">
+                            <div class="stat-card" style="padding: 1rem;">
+                                <div class="icon-box"
+                                    style="width: 36px; height: 36px; background: rgba(99, 102, 241, 0.2); color: #818cf8;">
+                                    <i data-lucide="wallet" style="width:18px;"></i>
+                                </div>
+                                <div class="stat-info">
+                                    <span class="stat-label">Total Balance</span>
+                                    <h3 class="stat-value" id="budget-balance" style="font-size: 1.2rem;">₹0.00</h3>
+                                </div>
+                            </div>
+                            <div class="stat-card" style="padding: 1rem;">
+                                <div class="icon-box"
+                                    style="width: 36px; height: 36px; background: rgba(34, 197, 94, 0.2); color: #4ade80;">
+                                    <i data-lucide="arrow-down-left" style="width:18px;"></i>
+                                </div>
+                                <div class="stat-info">
+                                    <span class="stat-label">Total Income</span>
+                                    <h3 class="stat-value" id="budget-income" style="font-size: 1.2rem;">₹0.00</h3>
+                                </div>
+                            </div>
+                            <div class="stat-card" style="padding: 1rem;">
+                                <div class="icon-box"
+                                    style="width: 36px; height: 36px; background: rgba(239, 68, 68, 0.2); color: #f87171;">
+                                    <i data-lucide="arrow-up-right" style="width:18px;"></i>
+                                </div>
+                                <div class="stat-info">
+                                    <span class="stat-label">Total Expenses</span>
+                                    <h3 class="stat-value" id="budget-expense" style="font-size: 1.2rem;">₹0.00</h3>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Expense Chart -->
+                    <div class="chart-card">
+                        <h3>Expense Breakdown</h3>
+                        <div class="chart-box"
+                            style="height: 250px; display: flex; align-items: center; justify-content: center;">
+                            <canvas id="expenseChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Transaction List -->
+                <div class="habits-section">
+                    <div
+                        style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+                        <h3>Recent Transactions</h3>
+                        <select id="budget-category-filter"
+                            style="padding: 0.4rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-primary); font-size: 0.85rem; outline: none;">
+                            <option value="all">All Categories</option>
+                            <option value="Food">Food</option>
+                            <option value="Transport">Transport</option>
+                            <option value="Bills">Bills</option>
+                            <option value="Entertainment">Entertainment</option>
+                            <option value="Shopping">Shopping</option>
+                            <option value="Salary">Salary</option>
+                            <option value="Investment">Investment</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div id="transaction-list" class="habit-list">
+                        <!-- Transactions injected here -->
+                        <div class="empty-state">Loading...</div>
                     </div>
                 </div>
             </div>
@@ -374,7 +489,6 @@
                 <div class="form-group">
                     <label>Reminder Time</label>
                     <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
-                        <!-- Hour -->
                         <select id="habit-time-hour"
                             style="padding: 0.8rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-primary); cursor:pointer;">
                             <option value="01">01</option>
@@ -391,7 +505,6 @@
                             <option value="12">12</option>
                         </select>
                         <span style="font-weight:bold;">:</span>
-                        <!-- Minute -->
                         <select id="habit-time-minute"
                             style="padding: 0.8rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-primary); cursor:pointer;">
                             <option value="00" selected>00</option>
@@ -407,7 +520,6 @@
                             <option value="50">50</option>
                             <option value="55">55</option>
                         </select>
-                        <!-- AM/PM -->
                         <select id="habit-time-ampm"
                             style="padding: 0.8rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-primary); cursor:pointer;">
                             <option value="AM" selected>AM</option>
@@ -418,8 +530,8 @@
                     <button type="button" id="habit-reminder-btn"
                         style="width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 0.8rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-secondary); cursor: pointer; margin-top: 0.5rem; transition: all 0.2s;">
                         <div style="display: flex; align-items: center; gap: 0.5rem; pointer-events: none;">
-                            <i data-lucide="calendar" style="width: 18px; height: 18px;"></i>
-                            <span id="habit-reminder-text">Add to Google Calendar</span>
+                            <i data-lucide="bell" style="width: 18px; height: 18px;"></i>
+                            <span id="habit-reminder-text">Enable Reminder</span>
                         </div>
                         <div id="habit-reminder-track"
                             style="width: 44px; height: 24px; background: rgba(255,255,255,0.1); border-radius: 12px; position: relative; transition: all 0.2s; pointer-events: none;">
@@ -437,7 +549,85 @@
         </div>
     </div>
 
+    <!-- Transaction Modal -->
+    <div id="transaction-modal" class="modal-overlay hidden">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Add Transaction</h3>
+                <button id="close-transaction-modal" class="btn-icon"><i data-lucide="x"></i></button>
+            </div>
+            <form id="transaction-form">
+                <div class="form-group">
+                    <label>Amount (₹)</label>
+                    <input type="number" id="trans-amount" placeholder="0.00" step="0.01" required
+                        style="width: 100%; padding: 0.8rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-primary); outline: none;">
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <input type="text" id="trans-desc" placeholder="e.g. Salary, Groceries" required maxlength="60"
+                        style="width: 100%; padding: 0.8rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-primary); outline: none;">
+                </div>
+                <div class="form-group">
+                    <div style="display: flex; gap: 1rem;">
+                        <div style="flex: 1;">
+                            <label>Type</label>
+                            <select id="trans-type"
+                                style="width: 100%; padding: 0.8rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-primary);">
+                                <option value="expense">Expense</option>
+                                <option value="income">Income</option>
+                            </select>
+                        </div>
+                        <div style="flex: 1;">
+                            <label>Category</label>
+                            <select id="trans-category"
+                                style="width: 100%; padding: 0.8rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-primary);">
+                                <option value="Food">Food</option>
+                                <option value="Transport">Transport</option>
+                                <option value="Bills">Bills</option>
+                                <option value="Entertainment">Entertainment</option>
+                                <option value="Shopping">Shopping</option>
+                                <option value="Salary">Salary</option>
+                                <option value="Investment">Investment</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Date</label>
+                    <input type="date" id="trans-date"
+                        style="width: 100%; padding: 0.8rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-primary);">
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">Save
+                        Transaction</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
+    <!-- Budget Limit Modal -->
+    <div id="budget-modal" class="modal-overlay hidden">
+        <div class="modal" style="max-width: 350px;">
+            <div class="modal-header">
+                <h3>Set Monthly Budget</h3>
+                <button id="close-budget-modal" class="btn-icon"><i data-lucide="x"></i></button>
+            </div>
+            <form id="budget-form">
+                <div class="form-group">
+                    <label>Monthly Limit (₹)</label>
+                    <input type="number" id="budget-limit-input" placeholder="e.g. 50000" required
+                        style="width: 100%; padding: 0.8rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-primary); outline: none;">
+                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.5rem;">This limit applies
+                        to the current month's expenses.</p>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">Save
+                        Limit</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <!-- User Inspector Modal -->
     <div id="inspector-modal" class="modal-overlay hidden">
@@ -517,8 +707,11 @@
     <!-- Application Logic -->
     <script src="js/firebase-config.js"></script>
     <script src="js/store.js"></script>
-    <script src="js/calendar.js"></script>
+    <!-- <script src="js/calendar.js"></script> -->
     <script src="js/charts.js"></script>
+    <script src="js/budget.js"></script>
+    <script src="js/auth-bridge.bundle.js"></script>
+    <script src="js/notifications.bundle.js"></script>
     <script src="js/app.js"></script>
     <script>
         lucide.createIcons();

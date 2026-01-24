@@ -58,6 +58,7 @@ body {
     width: 260px;
     background: var(--bg-secondary);
     padding: 2rem;
+    padding-top: max(2rem, env(safe-area-inset-top));
     display: flex;
     flex-direction: column;
     gap: 2rem;
@@ -700,6 +701,7 @@ body {
         align-items: center;
         justify-content: space-between;
         padding: 1rem 1.5rem;
+        padding-top: calc(1rem + env(safe-area-inset-top));
         background: var(--bg-secondary);
         border-bottom: var(--glass-border);
         flex-shrink: 0;
@@ -726,6 +728,7 @@ body {
         z-index: 1000;
         transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         box-shadow: 10px 0 30px rgba(0, 0, 0, 0.5);
+        padding-top: calc(2rem + env(safe-area-inset-top));
     }
 
     .sidebar.open {

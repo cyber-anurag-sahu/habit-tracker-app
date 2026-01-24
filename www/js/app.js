@@ -17,7 +17,12 @@ const App = {
         this.registerServiceWorker();
         this.startReminderChecker();
         this.registerServiceWorker();
-        // CalendarService.init() removed - loaded per user now
+        // Initialize Native Notifications
+        if (window.NotificationService) window.NotificationService.init();
+
+        // CalendarService Removed
+
+        if (window.Budget) Budget.init();
 
         this.adminUnsub = null;
 
@@ -44,27 +49,26 @@ const App = {
                     this.dom.userAvatar.src = user.photoURL || `https://ui-avatars.com/api/?name=${name}&background=6366f1&color=fff`;
                 }
 
-                // Load Calendar Session for this User
-                CalendarService.loadSession(user.uid);
+                // Load Calendar Session Removed
 
-                // Load Data
-                const success = await Store.load(user, this.pendingReferralCode);
+                // Load Data with Real-time Callback
+                const onDataChange = (source) => {
+                    console.log("Data Update:", source);
+                    this.render();
+                    Charts.render();
+                    if (source === 'budget' && window.Budget) Budget.render();
+                    if (source === 'transactions' && window.Budget) Budget.render();
+                };
+
+                const success = await Store.load(user, this.pendingReferralCode, onDataChange);
                 // Clear after use
                 this.pendingReferralCode = null;
 
                 if (success) {
-                    this.render();
+                    this.render(); // Initial Render
                     Charts.render();
 
-                    // Check Calendar Connection
-                    // Check Calendar Connection
-                    // Removed updateCalendarUI call since function was deleted
-                    if (!CalendarService.isConnected) {
-                        // Optional: Validate if the token is still good
-                        CalendarService.validateConnection().then(isValid => {
-                            if (!isValid) CalendarService.setToken(null);
-                        });
-                    }
+                    // Calendar Connection Check Removed
 
                     // Show Admin Button if applicable
                     const adminBtn = document.getElementById('nav-admin-btn');
@@ -88,7 +92,6 @@ const App = {
                 }
             } else {
                 console.log('User logged out');
-                CalendarService.reset(); // Clear calendar state
                 this.dom.loginOverlay.classList.remove('hidden'); // Show login screen
             }
         });
@@ -334,12 +337,28 @@ const App = {
 
         // --- Google Login ---
         if (this.dom.loginBtn) {
-            this.dom.loginBtn.addEventListener('click', () => {
-                const provider = new firebase.auth.GoogleAuthProvider();
-                auth.signInWithPopup(provider).catch(err => {
-                    console.error("Google Login failed", err);
-                    alert("Login failed: " + err.message);
-                });
+            this.dom.loginBtn.addEventListener('click', async () => {
+                // Check for Native Platform via Bridge
+                if (window.NativeAuth && window.NativeAuth.isNative) {
+                    try {
+                        const result = await window.NativeAuth.signInWithGoogle();
+                        // Google Sign-In successful, now sign in to Firebase
+                        // The plugin structure returns { user: ..., credential: { idToken: ... } }
+                        const idToken = result.credential.idToken;
+                        const credential = firebase.auth.GoogleAuthProvider.credential(idToken);
+                        await auth.signInWithCredential(credential);
+                    } catch (err) {
+                        console.error("Native Google Login failed", err);
+                        alert("Login Error: " + (err.message || JSON.stringify(err)));
+                    }
+                } else {
+                    // Web Fallback
+                    const provider = new firebase.auth.GoogleAuthProvider();
+                    auth.signInWithPopup(provider).catch(err => {
+                        console.error("Google Login failed", err);
+                        alert("Login failed: " + err.message);
+                    });
+                }
             });
         }
 
@@ -395,25 +414,8 @@ const App = {
         if (this.dom.habitReminderBtn) {
             this.dom.habitReminderBtn.addEventListener('click', () => {
                 const isActive = this.dom.habitReminderBtn.dataset.active === 'true';
-
-                if (!isActive) {
-                    // Turn ON
-                    if (CalendarService && CalendarService.isConnected) {
-                        this.toggleReminderState(true);
-                    } else {
-                        // Not connected? Trigger Auth Flow
-                        if (confirm("Connect Google Calendar to enable reliable background reminders?")) {
-                            this.handleConnectCalendar().then(() => {
-                                if (CalendarService.isConnected) {
-                                    this.toggleReminderState(true);
-                                }
-                            });
-                        }
-                    }
-                } else {
-                    // Turn OFF
-                    this.toggleReminderState(false);
-                }
+                // Simply toggle state - local only
+                this.toggleReminderState(!isActive);
             });
         }
 
@@ -479,30 +481,7 @@ const App = {
 
     },
 
-    async handleConnectCalendar() {
-        if (!auth.currentUser) return;
-
-        const provider = new firebase.auth.GoogleAuthProvider();
-        provider.addScope('https://www.googleapis.com/auth/calendar.events');
-
-        try {
-            // We use linkWithPopup or reauthenticate
-            // Let's try reauth first as it's safer for existing users
-            // Or if we just want the token, we can use signInWithPopup again, but that might re-trigger auth flow
-            const result = await auth.currentUser.reauthenticateWithPopup(provider);
-            const credential = result.credential;
-            const accessToken = credential.accessToken;
-
-            if (accessToken) {
-                CalendarService.setToken(accessToken);
-                alert("Google Calendar Connected! Future habits will be synced.");
-                // updateCalendarUI(true); // removed
-            }
-        } catch (error) {
-            console.error("Calendar Auth Error:", error);
-            alert("Connection failed: " + error.message);
-        }
-    },
+    // handleConnectCalendar Removed
 
     // updateCalendarUI removed
 
@@ -535,6 +514,9 @@ const App = {
 
         if (viewName === 'analytics') {
             Charts.render();
+        } else if (viewName === 'budget') {
+            console.log("App: Switching to Budget View");
+            Budget.render();
         } else if (viewName === 'admin') {
             this.renderAdmin();
         }
@@ -876,28 +858,74 @@ const App = {
                 this.dom.inspectorTitle.textContent = `Inspecting: ${name}`;
                 this.dom.inspectorContent.innerHTML = '<p style="color:var(--text-secondary)">Loading user data...</p>';
 
-                // Fetch Data
-                const habits = await Store.getUserHabits(uid);
+                // Fetch Data Parallel
+                const [habits, transactions, budgetLimit] = await Promise.all([
+                    Store.getUserHabits(uid),
+                    Store.getUserTransactions(uid),
+                    Store.getUserBudgetLimit(uid)
+                ]);
+
+                // Calculate Stats
+                let totalSpent = 0;
+                let totalIncome = 0;
+                transactions.forEach(t => {
+                    if (t.type === 'expense') totalSpent += t.amount;
+                    else totalIncome += t.amount;
+                });
+
+                // Format Money Helper
+                const fmt = (n) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(n);
+
+                // Build HTML
+                let html = `<div style="display:grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 1rem;">
+                    <div style="background: rgba(255,255,255,0.05); padding: 0.8rem; border-radius: 8px;">
+                        <span style="font-size:0.75rem; color:var(--text-secondary);">Budget Goal</span>
+                        <div style="font-weight:bold; font-size:1.1rem;">${fmt(budgetLimit)}</div>
+                    </div>
+                     <div style="background: rgba(255,255,255,0.05); padding: 0.8rem; border-radius: 8px;">
+                        <span style="font-size:0.75rem; color:var(--text-secondary);">Total Spent</span>
+                        <div style="font-weight:bold; font-size:1.1rem; color:var(--danger);">${fmt(totalSpent)}</div>
+                    </div>
+                </div>`;
+
+                html += `<h4 style="margin-bottom:0.5rem; border-bottom:1px solid var(--glass-border); padding-bottom:0.2rem;">Habits (${habits.length})</h4>`;
 
                 if (habits.length === 0) {
-                    this.dom.inspectorContent.innerHTML = '<p style="text-align:center; padding:1rem;">No habits found for this user.</p>';
+                    html += '<p style="text-align:center; padding:0.5rem; font-size:0.9rem; color:var(--text-secondary);">No habits found.</p>';
                 } else {
-                    this.dom.inspectorContent.innerHTML = habits.map(h => {
-                        // Calc Streak
+                    html += habits.map(h => {
                         const streak = Store.calculateStreak(h);
                         return `
-                            <div style="background: rgba(255,255,255,0.05); padding: 0.75rem; border-radius: 8px; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
+                            <div style="padding: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: space-between;">
                                 <div style="display:flex; align-items:center; gap:0.5rem;">
                                     <span>${h.emoji}</span>
-                                    <strong>${h.name}</strong>
+                                    <span>${h.name}</span>
                                 </div>
-                                <div style="color: var(--accent); font-size: 0.9rem;">
-                                    🔥 ${streak} day streak
-                                </div>
+                                <span style="font-size: 0.8rem; color: var(--accent);">🔥 ${streak}</span>
                             </div>
                          `;
                     }).join('');
                 }
+
+                html += `<h4 style="margin-top:1rem; margin-bottom:0.5rem; border-bottom:1px solid var(--glass-border); padding-bottom:0.2rem;">Recent Transactions</h4>`;
+
+                if (transactions.length === 0) {
+                    html += '<p style="text-align:center; padding:0.5rem; font-size:0.9rem; color:var(--text-secondary);">No transactions found.</p>';
+                } else {
+                    // Show last 5
+                    const recent = transactions.sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5);
+                    html += recent.map(t => {
+                        const isExp = t.type === 'expense';
+                        return `
+                             <div style="padding: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: space-between; font-size:0.9rem;">
+                                <span>${t.description}</span>
+                                <span style="color: ${isExp ? 'var(--danger)' : 'var(--success)'};">${isExp ? '-' : '+'} ${fmt(t.amount)}</span>
+                            </div>
+                        `;
+                    }).join('');
+                }
+
+                this.dom.inspectorContent.innerHTML = html;
             };
         });
     },
@@ -965,7 +993,8 @@ const App = {
                 const btn = e.target.closest('.check-btn');
                 const id = btn.dataset.id;
 
-                await Store.toggleCheck(id, today);
+                // Optimistic: Don't await the store op
+                Store.toggleCheck(id, today);
                 this.render();
                 Charts.render();
 
@@ -987,7 +1016,7 @@ const App = {
                 console.log("Deleting ID:", id); // Debug log
 
                 if (confirm(`Delete habit "${name}"?`)) {
-                    await Store.deleteHabit(id);
+                    Store.deleteHabit(id); // Async/Optimistic
                     this.render();
                     Charts.render();
                 }
@@ -1141,7 +1170,7 @@ const App = {
             this.dom.habitReminderBtn.style.color = '#fff';
             this.dom.habitReminderBtn.style.borderColor = 'var(--accent)';
             this.dom.habitReminderBtn.style.opacity = '1';
-            this.dom.habitReminderText.textContent = "Synced with Google Calendar";
+            this.dom.habitReminderText.textContent = "Reminder Enabled";
 
             // Toggle Animation (ON)
             if (this.dom.habitReminderKnob) {
@@ -1164,7 +1193,7 @@ const App = {
             this.dom.habitReminderBtn.style.color = 'var(--text-secondary)';
             this.dom.habitReminderBtn.style.borderColor = 'var(--border-color)';
             this.dom.habitReminderBtn.style.opacity = '0.7';
-            this.dom.habitReminderText.textContent = "Add to Google Calendar";
+            this.dom.habitReminderText.textContent = "Enable Reminder";
 
             // Toggle Animation (OFF)
             if (this.dom.habitReminderKnob) {
@@ -1177,7 +1206,7 @@ const App = {
 
             lucide.createIcons({
                 nameAttr: 'data-lucide',
-                attrs: { class: "lucide lucide-calendar" },
+                attrs: { class: "lucide lucide-bell" },
                 root: this.dom.habitReminderBtn
             });
         }
